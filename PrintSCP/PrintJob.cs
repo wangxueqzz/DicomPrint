@@ -17,15 +17,15 @@ using Dicom.Printing;
 
 namespace PrintSCP
 {
-    public class StatusUpdateEventArgs : EventArgs
+    public class PrintStatusEventArgs : EventArgs
     {
-        public ushort EventTypeId { get; private set; }
+        public int EventTypeId { get; private set; }
         public string ExecutionStatusInfo { get; private set; }
         public string FilmSessionLabel { get; private set; }
         public string PrinterName { get; private set; }
 
-        public StatusUpdateEventArgs(
-            ushort eventTypeId,
+        public PrintStatusEventArgs(
+            int eventTypeId,
             string executionStatusInfo,
             string filmSessionLabel,
             string printerName)
@@ -37,50 +37,72 @@ namespace PrintSCP
         }
     }
 
-    internal enum PrintJobStatus : ushort
+    internal enum PrintStatus
     {
         Pending = 1,
-
         Printing = 2,
-
         Done = 3,
-
         Failure = 4
     }
-
 
     internal class PrintJob : DicomDataset
     {
         #region Properties and Attributes
 
-        public bool SendNEventReport { get; set; }
-
-        private readonly object _synchRoot = new object();
-
-        public Guid PrintJobGuid { get; private set; }
-
-        public IList<string> FilmBoxFolderList { get; private set; }
-
-        public Printer Printer { get; private set; }
-
-        public PrintJobStatus Status { get; private set; }
-
-        public string PrintJobFolder { get; private set; }
-
-        public string FullPrintJobFolder { get; private set; }
-
-        public Exception Error { get; private set; }
-
-        public string FilmSessionLabel { get; private set; }
-
         private int _currentPage;
-
         private FilmBox _currentFilmBox;
+        private string _jobFolder;
 
         /// <summary>
         /// Print job SOP class UID
         /// </summary>
         public readonly DicomUID SOPClassUID = DicomUID.PrintJobSOPClass;
+
+        private readonly object _synchRoot = new object();
+
+        public bool SendNEventReport { get; set; }
+
+        public IList<string> FilmBoxFolderList { get; private set; }
+
+        public Printer Printer { get; private set; }
+
+        public PrintStatus Status { get; private set; }
+
+        private string PrintJobFolder
+        {
+            get
+            {
+                // DICOM文件路径存储规则，如:D:\DICOMPIC\yyyy\MM\dd\IP\AE\打印任务UID.
+                // 例子：D:\DICOMPIC\2017\07\15\192.168.0.88\PR_AW\UID\
+                if (string.IsNullOrEmpty(_jobFolder))
+                {
+                    DateTime dt = DateTime.Now;
+                    string strDate = string.Format(@"{0}\{1}\{2}", dt.Year, dt.Month, dt.Day);
+                    _jobFolder = Path.Combine(PrintSCPService.ImageFolder, strDate, CallingIPAddress.ToString(), CallingAETitle, SOPInstanceUID.UID);
+
+                    if (Directory.Exists(_jobFolder))
+                    {
+                        try
+                        {
+                            Directory.Delete(_jobFolder, true);
+                        }
+                        catch { }
+                    }
+
+                    if (!Directory.Exists(_jobFolder))
+                    {
+                        Directory.CreateDirectory(_jobFolder);
+                    }
+                }
+
+                return _jobFolder;
+            }
+        }
+
+
+        public Exception Error { get; private set; }
+
+        public string FilmSessionLabel { get; private set; }
 
         /// <summary>
         /// Print job SOP instance UID
@@ -199,11 +221,9 @@ namespace PrintSCP
 
         public IPAddress CallingIPAddress { get; set; }
 
-        public Dicom.Log.Logger Log { get; private set; }
+        private Dicom.Log.Logger Log { get; set; }
 
-        //public List<string> ImageList { get; set; }
-
-        public event EventHandler<StatusUpdateEventArgs> StatusUpdate;
+        public event EventHandler<PrintStatusEventArgs> StatusUpdate;
 
         #endregion
 
@@ -237,7 +257,7 @@ namespace PrintSCP
             this.Add(DicomTag.SOPInstanceUID, SOPInstanceUID);
 
             Printer = printer;
-            Status = PrintJobStatus.Pending;
+            Status = PrintStatus.Pending;
             PrinterName = Printer.PrinterAet;
 
             CallingAETitle = callingAETitle;
@@ -248,26 +268,6 @@ namespace PrintSCP
             {
                 CreationDateTime = DateTime.Now;
             }
-
-            PrintJobFolder = SOPInstanceUID.UID;
-
-
-
-            //imageFolder should read from ini file
-            var iniPath = string.Format(@"{0}\{1}", Environment.CurrentDirectory, @"PrintSCPConfiguration.ini");
-            string imageFolder = IniFile.ReadIniData("PrintSCP", "ImageFolder", "PrintImages", iniPath);
-            if (imageFolder == String.Empty)
-            {
-                imageFolder = "PrintImages";
-            }
-
-            //Get Current Date
-            string dateFolder = DateTime.Now.ToString("yyyyMMdd");
-
-            var receivingFolder = string.Format(@"{0}\{1}", imageFolder, dateFolder);
-            //FullPrintJobFolder shoud pad with AutoID, Which is get from DataBase
-            // Can We use This SOPInstanceUID As AutoID??
-            FullPrintJobFolder = string.Format(@"{0}\{1}", receivingFolder.TrimEnd('\\'), PrintJobFolder);
 
             FilmBoxFolderList = new List<string>();
         }
@@ -280,7 +280,7 @@ namespace PrintSCP
         {
             try
             {
-                Status = PrintJobStatus.Pending;
+                Status = PrintStatus.Pending;
 
                 OnStatusUpdate("Preparing films for printing");
 
@@ -294,9 +294,9 @@ namespace PrintSCP
             catch (Exception ex)
             {
                 Error = ex;
-                Status = PrintJobStatus.Failure;
+                Status = PrintStatus.Failure;
                 OnStatusUpdate("Print failed");
-                DeletePrintFolder();
+                DeleteJobFolder();
             }
         }
 
@@ -304,13 +304,13 @@ namespace PrintSCP
         {
             try
             {
-                Status = PrintJobStatus.Printing;
+                Status = PrintStatus.Printing;
                 OnStatusUpdate("Printing Started");
 
                 //PrintThreadParameter printThreadParametr = (PrintThreadParameter)arg;
                 IList <FilmBox> filmBoxList   = (IList <FilmBox>)arg;
 
-                var printJobDir = new System.IO.DirectoryInfo(FullPrintJobFolder);
+                var printJobDir = new System.IO.DirectoryInfo(PrintJobFolder);
                 if (!printJobDir.Exists)
                 {
                     printJobDir.Create();
@@ -413,12 +413,12 @@ namespace PrintSCP
                     autoIDList.Add(autoID.UID);
                 }
 
-                Status = PrintJobStatus.Done;
+                Status = PrintStatus.Done;
                 OnStatusUpdate("Printing Done");
             }
             catch (Exception ex)
             {
-                Status = PrintJobStatus.Failure;
+                Status = PrintStatus.Failure;
                 OnStatusUpdate("Printing failed");
                 Log.Error("Print Job {0} FAIL: {1}", SOPInstanceUID.UID.Split('.').Last(), ex.Message);
             }
@@ -507,7 +507,7 @@ namespace PrintSCP
         private void OnQueryPageSettings(object sender, QueryPageSettingsEventArgs e)
         {
             OnStatusUpdate(string.Format("Printing film {0} of {1}", _currentPage + 1, FilmBoxFolderList.Count));
-            var filmBoxFolder = string.Format("{0}\\{1}", FullPrintJobFolder, FilmBoxFolderList[_currentPage]);
+            var filmBoxFolder = string.Format("{0}\\{1}", PrintJobFolder, FilmBoxFolderList[_currentPage]);
             var filmSession = FilmSession.Load(string.Format("{0}\\FilmSession.dcm", filmBoxFolder));
             _currentFilmBox = FilmBox.Load(filmSession, filmBoxFolder);
 
@@ -519,12 +519,16 @@ namespace PrintSCP
             e.PageSettings.Landscape = _currentFilmBox.FilmOrienation == "LANDSCAPE";
         }
 
-        private void DeletePrintFolder()
+        private void DeleteJobFolder()
         {
-            var folderInfo = new System.IO.DirectoryInfo(FullPrintJobFolder);
+            var folderInfo = new System.IO.DirectoryInfo(PrintJobFolder);
             if (folderInfo.Exists)
             {
-                folderInfo.Delete(true);
+                try
+                {
+                    folderInfo.Delete(true);
+                }
+                catch { }
             }
         }
 
@@ -537,7 +541,7 @@ namespace PrintSCP
             ExecutionStatus = Status.ToString();
             ExecutionStatusInfo = info;
 
-            if (Status != PrintJobStatus.Failure)
+            if (Status != PrintStatus.Failure)
             {
                 Log.Info("Print Job {0} Status {1}: {2}", SOPInstanceUID.UID.Split('.').Last(), Status, info);
             }
@@ -545,9 +549,10 @@ namespace PrintSCP
             {
                 Log.Error("Print Job {0} Status {1}: {2}", SOPInstanceUID.UID.Split('.').Last(), Status, info);
             }
+
             if (StatusUpdate != null)
             {
-                var args = new StatusUpdateEventArgs((ushort)Status, info, FilmSessionLabel, PrinterName);
+                var args = new PrintStatusEventArgs(Status, info, FilmSessionLabel, PrinterName);
                 StatusUpdate(this, args);
             }
         }

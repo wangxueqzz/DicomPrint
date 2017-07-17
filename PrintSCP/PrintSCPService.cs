@@ -55,7 +55,7 @@ namespace PrintSCP
             set;
         }
 
-        public static string DicomPath
+        public static string ImageFolder
         {
             get { return _imageFolder; }
             set { _imageFolder = value; }
@@ -705,7 +705,7 @@ namespace PrintSCP
             }
         }
 
-        private void OnPrintJobStatusUpdate(object sender, StatusUpdateEventArgs e)
+        private void OnPrintJobStatusUpdate(object sender, PrintStatusEventArgs e)
         {
             var printJob = sender as PrintJob;
             if (printJob.SendNEventReport)

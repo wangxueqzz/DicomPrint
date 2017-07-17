@@ -670,7 +670,6 @@ namespace PrintSCP
                     }
 
                     var printJob = new PrintJob(null, Printer, RemoteIP, CallingAE, CalledAE, this.Logger);
-                    printJob.SendNEventReport = _sendEventReports;
                     printJob.StatusUpdate += OnPrintJobStatusUpdate;
 
                     printJob.Print(filmBoxList);
@@ -715,7 +714,7 @@ namespace PrintSCP
         private void OnPrintJobStatusUpdate(object sender, PrintStatusEventArgs e)
         {
             var printJob = sender as PrintJob;
-            if (printJob.SendNEventReport)
+            if (_sendEventReports)
             {
                 var reportRequest = new DicomNEventReportRequest(
                     printJob.SOPClassUID,

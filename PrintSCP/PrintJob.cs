@@ -48,25 +48,21 @@ namespace PrintSCP
     internal class PrintJob : DicomDataset
     {
         #region Properties and Attributes
+        
+        public readonly DicomUID SOPClassUID = DicomUID.PrintJobSOPClass;
 
         private int _currentPage;
         private FilmBox _currentFilmBox;
         private string _jobFolder;
-
-        /// <summary>
-        /// Print job SOP class UID
-        /// </summary>
-        public readonly DicomUID SOPClassUID = DicomUID.PrintJobSOPClass;
-
         private readonly object _synchRoot = new object();
 
         public bool SendNEventReport { get; set; }
 
-        public IList<string> FilmBoxFolderList { get; private set; }
+        private IList<string> FilmBoxFolderList { get; private set; }
 
         public Printer Printer { get; private set; }
 
-        public PrintStatus Status { get; private set; }
+        private PrintStatus Status { get; private set; }
 
         private string PrintJobFolder
         {
@@ -98,7 +94,6 @@ namespace PrintSCP
                 return _jobFolder;
             }
         }
-
 
         public Exception Error { get; private set; }
 
@@ -284,10 +279,31 @@ namespace PrintSCP
 
                 OnStatusUpdate("Preparing films for printing");
 
-                var thread = new Thread(new ParameterizedThreadStart(DoPrint));
-                thread.Name = string.Format("PrintJob {0}", SOPInstanceUID.UID);
-                thread.IsBackground = true;
-                thread.Start(filmBoxList);
+                var printJobDir = new System.IO.DirectoryInfo(PrintJobFolder);
+                if (!printJobDir.Exists)
+                {
+                    printJobDir.Create();
+                }
+
+                DicomFile file;
+                int filmsCount = FilmBoxFolderList.Count;
+                for (int i = 0; i < filmBoxList.Count; i++)
+                {
+                    var filmBox = filmBoxList[i];
+                    var filmBoxDir = printJobDir.CreateSubdirectory(string.Format("F{0:000000}", i + 1 + filmsCount));
+
+                    file = new DicomFile(filmBox.FilmSession);
+                    file.Save(string.Format(@"{0}\FilmSession.dcm", filmBoxDir.FullName));
+
+                    FilmBoxFolderList.Add(filmBoxDir.Name);
+                    filmBox.Save(filmBoxDir.FullName);
+
+                    //generate jpg image
+                    var combineJpgFile = string.Format(@"{0}\{1}" + ".jpg", FilmBoxFolderList[i], autoID.UID);
+                    int row = 0, column = 0;
+                    GetDisplayFormat(printTask.ImageDisplayFormat, ref row, ref column);
+                    CombineImages(ImageList, combineJpgFile,row,column);
+                }
 
                 FilmSessionLabel = filmBoxList.First().FilmSession.FilmSessionLabel;
             }
@@ -333,36 +349,36 @@ namespace PrintSCP
                     FilmBoxFolderList.Add(filmBoxDir.FullName);
                     List<string> ImageList = filmBox.SaveImage(filmBoxDir.FullName);
 
+                    //#region  PrintTask Content
+                    //PrintTask printTask = new PrintTask();
+                    //printTask.FilmUID = autoID.UID;
+                    //printTask.CallingIPAddress = CallingIPAddress;
+                    //printTask.CallingAE = CallingAETitle;
+                    //printTask.CalledAE = CalledAETitle;
 
-                    #region  PrintTask Content
-                    PrintTask printTask = new PrintTask();
-                    printTask.FilmUID = autoID.UID;
-                    printTask.CallingIPAddress = CallingIPAddress;
-                    printTask.CallingAE = CallingAETitle;
-                    printTask.CalledAE = CalledAETitle;
+                    //#region  Get Film Session Level DICOM Tag, Save in PrintTag Structure
+                    //printTask.NumberOfCopies = filmBox.FilmSession.NumberOfCopies;
+                    //printTask.MediumType = filmBox.FilmSession.MediumType;
+                    //#endregion
 
-                    #region  Get Film Session Level DICOM Tag, Save in PrintTag Structure
-                    printTask.NumberOfCopies = filmBox.FilmSession.NumberOfCopies;
-                    printTask.MediumType = filmBox.FilmSession.MediumType;
+
+                    //#region  Get Film Box Level DICOM Tag, Save in PrintTag Structure
+                    //printTask.printUID = SOPInstanceUID.UID;
+                    //printTask.BorderDensity = filmBox.BorderDensity;
+                    //printTask.ImageDisplayFormat = filmBox.ImageDisplayFormat;
+                    //printTask.EmptyImageDensity = filmBox.EmptyImageDensity;
+                    //printTask.FilmSizeID = filmBox.FilmSizeID;
+                    //printTask.FilmOrienation = filmBox.FilmOrienation;
+                    //printTask.MagnificationType = filmBox.MagnificationType;
+                    //printTask.MaxDensity = filmBox.MaxDensity;
+                    //printTask.MinDensity = filmBox.MinDensity;
+                    //printTask.SmoothingType = filmBox.SmoothingType;
+                    //printTask.Trim = filmBox.Trim;
+                    //printTask.PresentationLut = filmBox.PresentationLut == null ? string.Empty : filmBox.PresentationLut.ToString();
+                    //#endregion
+
                     #endregion
 
-
-                    #region  Get Film Box Level DICOM Tag, Save in PrintTag Structure
-                    printTask.printUID = SOPInstanceUID.UID;
-                    printTask.BorderDensity = filmBox.BorderDensity;
-                    printTask.ImageDisplayFormat = filmBox.ImageDisplayFormat;
-                    printTask.EmptyImageDensity = filmBox.EmptyImageDensity;
-                    printTask.FilmSizeID = filmBox.FilmSizeID;
-                    printTask.FilmOrienation = filmBox.FilmOrienation;
-                    printTask.MagnificationType = filmBox.MagnificationType;
-                    printTask.MaxDensity = filmBox.MaxDensity;
-                    printTask.MinDensity = filmBox.MinDensity;
-                    printTask.SmoothingType = filmBox.SmoothingType;
-                    printTask.Trim = filmBox.Trim;
-                    printTask.PresentationLut = filmBox.PresentationLut == null ? string.Empty : filmBox.PresentationLut.ToString();
-                    #endregion
-
-                    #endregion
                     int index = 0;
                     foreach (var item in filmBox.BasicImageBoxes)
                     {
@@ -403,14 +419,14 @@ namespace PrintSCP
                     GetDisplayFormat(printTask.ImageDisplayFormat, ref row, ref column);
                     CombineImages(ImageList, combineJpgFile,row,column);
 
-                    printTask.JpgFilmPath = combineJpgFile;
-                    //Save into Table T_PrintTag
-                    if (printTask.SaveToDB(Log) == false)
-                    {
-                        Log.Error("Print Job {0} FAIL: {1}", SOPInstanceUID.UID.Split('.').Last(), "Save printTask to DB Failed");
-                    }
+                    //printTask.JpgFilmPath = combineJpgFile;
+                    ////Save into Table T_PrintTag
+                    //if (printTask.SaveToDB(Log) == false)
+                    //{
+                    //    Log.Error("Print Job {0} FAIL: {1}", SOPInstanceUID.UID.Split('.').Last(), "Save printTask to DB Failed");
+                    //}
 
-                    autoIDList.Add(autoID.UID);
+                    //autoIDList.Add(autoID.UID);
                 }
 
                 Status = PrintStatus.Done;

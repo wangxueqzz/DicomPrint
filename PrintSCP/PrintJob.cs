@@ -19,13 +19,13 @@ namespace PrintSCP
 {
     public class PrintStatusEventArgs : EventArgs
     {
-        public int EventTypeId { get; private set; }
+        public ushort EventTypeId { get; private set; }
         public string ExecutionStatusInfo { get; private set; }
         public string FilmSessionLabel { get; private set; }
         public string PrinterName { get; private set; }
 
         public PrintStatusEventArgs(
-            int eventTypeId,
+            ushort eventTypeId,
             string executionStatusInfo,
             string filmSessionLabel,
             string printerName)
@@ -37,7 +37,7 @@ namespace PrintSCP
         }
     }
 
-    internal enum PrintStatus
+    internal enum PrintStatus : ushort
     {
         Pending = 1,
         Printing = 2,
@@ -51,18 +51,16 @@ namespace PrintSCP
         
         public readonly DicomUID SOPClassUID = DicomUID.PrintJobSOPClass;
 
-        private int _currentPage;
-        private FilmBox _currentFilmBox;
         private string _jobFolder;
         private readonly object _synchRoot = new object();
 
         public bool SendNEventReport { get; set; }
 
-        private IList<string> FilmBoxFolderList { get; private set; }
+        private IList<string> FilmBoxFolderList { get; set; }
 
         public Printer Printer { get; private set; }
 
-        private PrintStatus Status { get; private set; }
+        private PrintStatus Status { get; set; }
 
         private string PrintJobFolder
         {
@@ -74,7 +72,7 @@ namespace PrintSCP
                 {
                     DateTime dt = DateTime.Now;
                     string strDate = string.Format(@"{0}\{1}\{2}", dt.Year, dt.Month, dt.Day);
-                    _jobFolder = Path.Combine(PrintSCPService.ImageFolder, strDate, CallingIPAddress.ToString(), CallingAETitle, SOPInstanceUID.UID);
+                    _jobFolder = Path.Combine(PrintSCPService.DicomPath, strDate, CallingIPAddress.ToString(), CallingAETitle, SOPInstanceUID.UID);
 
                     if (Directory.Exists(_jobFolder))
                     {
@@ -285,24 +283,20 @@ namespace PrintSCP
                     printJobDir.Create();
                 }
 
-                DicomFile file;
-                int filmsCount = FilmBoxFolderList.Count;
+                DicomFile dcmfile;
                 for (int i = 0; i < filmBoxList.Count; i++)
                 {
                     var filmBox = filmBoxList[i];
-                    var filmBoxDir = printJobDir.CreateSubdirectory(string.Format("F{0:000000}", i + 1 + filmsCount));
+                    var filmBoxDir = printJobDir.CreateSubdirectory(string.Format("F{0:000000}", i + 1));
 
-                    file = new DicomFile(filmBox.FilmSession);
-                    file.Save(string.Format(@"{0}\FilmSession.dcm", filmBoxDir.FullName));
-
-                    FilmBoxFolderList.Add(filmBoxDir.Name);
+                    dcmfile = new DicomFile(filmBox.FilmSession);
+                    dcmfile.Save(string.Format(@"{0}\FilmSession.dcm", filmBoxDir.FullName));
                     filmBox.Save(filmBoxDir.FullName);
 
                     //generate jpg image
-                    var combineJpgFile = string.Format(@"{0}\{1}" + ".jpg", FilmBoxFolderList[i], autoID.UID);
-                    int row = 0, column = 0;
-                    GetDisplayFormat(printTask.ImageDisplayFormat, ref row, ref column);
-                    CombineImages(ImageList, combineJpgFile,row,column);
+                    var combineJpgFile = string.Format(@"{0}\View.jpg", filmBoxDir.FullName);
+
+                    CombineImages(filmBox, combineJpgFile);
                 }
 
                 FilmSessionLabel = filmBoxList.First().FilmSession.FilmSessionLabel;
@@ -316,223 +310,80 @@ namespace PrintSCP
             }
         }
 
-        private void DoPrint(object arg)
+        private void CombineImages(FilmBox filmBox, string combinedJpgFile)
         {
             try
             {
-                Status = PrintStatus.Printing;
-                OnStatusUpdate("Printing Started");
+                int row = 0, column = 0;
+                string strDisplayformt = filmBox.ImageDisplayFormat;
 
-                //PrintThreadParameter printThreadParametr = (PrintThreadParameter)arg;
-                IList <FilmBox> filmBoxList   = (IList <FilmBox>)arg;
-
-                var printJobDir = new System.IO.DirectoryInfo(PrintJobFolder);
-                if (!printJobDir.Exists)
+                string[] dispalyformatArray = Regex.Split(strDisplayformt, @"\\");
+                if (dispalyformatArray.Length > 2)
                 {
-                    printJobDir.Create();
-                }
-
-                DicomFile file;
-                List<string> autoIDList = new List<string>();
-                for (int i = 0; i < filmBoxList.Count; i++)
-                {
-                    DicomUID autoID = DicomUID.Generate();
-                    var filmBox = filmBoxList[i];
-                    //One Film Box, One Folder
-                    //var filmBoxDir = printJobDir.CreateSubdirectory(string.Format("F{0:000000}", i + 1 ));
-                    var filmBoxDir = printJobDir.CreateSubdirectory(autoID.UID);
-
-                    //Film Session Relative DICOM Tag
-                    file = new DicomFile(filmBox.FilmSession);
-                    file.Save(string.Format(@"{0}\FilmSession.dcm", filmBoxDir.FullName));
-
-                    FilmBoxFolderList.Add(filmBoxDir.FullName);
-                    List<string> ImageList = filmBox.SaveImage(filmBoxDir.FullName);
-
-                    //#region  PrintTask Content
-                    //PrintTask printTask = new PrintTask();
-                    //printTask.FilmUID = autoID.UID;
-                    //printTask.CallingIPAddress = CallingIPAddress;
-                    //printTask.CallingAE = CallingAETitle;
-                    //printTask.CalledAE = CalledAETitle;
-
-                    //#region  Get Film Session Level DICOM Tag, Save in PrintTag Structure
-                    //printTask.NumberOfCopies = filmBox.FilmSession.NumberOfCopies;
-                    //printTask.MediumType = filmBox.FilmSession.MediumType;
-                    //#endregion
-
-
-                    //#region  Get Film Box Level DICOM Tag, Save in PrintTag Structure
-                    //printTask.printUID = SOPInstanceUID.UID;
-                    //printTask.BorderDensity = filmBox.BorderDensity;
-                    //printTask.ImageDisplayFormat = filmBox.ImageDisplayFormat;
-                    //printTask.EmptyImageDensity = filmBox.EmptyImageDensity;
-                    //printTask.FilmSizeID = filmBox.FilmSizeID;
-                    //printTask.FilmOrienation = filmBox.FilmOrienation;
-                    //printTask.MagnificationType = filmBox.MagnificationType;
-                    //printTask.MaxDensity = filmBox.MaxDensity;
-                    //printTask.MinDensity = filmBox.MinDensity;
-                    //printTask.SmoothingType = filmBox.SmoothingType;
-                    //printTask.Trim = filmBox.Trim;
-                    //printTask.PresentationLut = filmBox.PresentationLut == null ? string.Empty : filmBox.PresentationLut.ToString();
-                    //#endregion
-
-                    #endregion
-
-                    int index = 0;
-                    foreach (var item in filmBox.BasicImageBoxes)
+                    string[] displayformatValue = Regex.Split(dispalyformatArray[1], @",");
+                    if (displayformatValue[0] != null && displayformatValue[1] != null)
                     {
-                        if (item != null && item.ImageSequence != null && item.ImageSequence.Contains(DicomTag.PixelData))
-                        {
-                            try
-                            {
-                                var image = new DicomImage(item.ImageSequence);
-                                image.RenderImage().AsBitmap().Save(ImageList[index]);
-
-                                #region PrintImage Content
-                                PrintImage printImage = new PrintImage();
-                                printImage.FilmUID = autoID.UID;
-                                printImage.ImageBoxPosition = index;
-                                printImage.BitsAllocated = image.PixelData.BitsAllocated;
-                                printImage.BitsStored = image.PixelData.BitsStored;
-                                printImage.HighBit = image.PixelData.HighBit;
-                                string imagePath = string.Format(@"{0}\I{1:000000}", filmBoxDir.FullName, index + 1);
-                                printImage.DicomFilePath = imagePath + ".dcm";
-                                //Save into Table T_PrintTag
-                                if (printImage.SaveToDB(Log) == false)
-                                {
-                                    Log.Error("Print Job {0} FAIL: {1}", SOPInstanceUID.UID.Split('.').Last(), "Save PrintImage to DB Failed");
-                                }
-                                #endregion
-                                index++;
-                            }
-                            finally
-                            {
-
-                            }
-                        }
+                        column = Convert.ToInt32(displayformatValue[0]);
+                        row = Convert.ToInt32(displayformatValue[1]);
                     }
-
-                    //Parse DICOM File and render into Memory As image
-                    var combineJpgFile = string.Format(@"{0}\{1}" + ".jpg", FilmBoxFolderList[i], autoID.UID);
-                    int row = 0, column = 0;
-                    GetDisplayFormat(printTask.ImageDisplayFormat, ref row, ref column);
-                    CombineImages(ImageList, combineJpgFile,row,column);
-
-                    //printTask.JpgFilmPath = combineJpgFile;
-                    ////Save into Table T_PrintTag
-                    //if (printTask.SaveToDB(Log) == false)
-                    //{
-                    //    Log.Error("Print Job {0} FAIL: {1}", SOPInstanceUID.UID.Split('.').Last(), "Save printTask to DB Failed");
-                    //}
-
-                    //autoIDList.Add(autoID.UID);
+                }
+                else
+                {
+                    throw new Exception("GetDisplayFormat failed with DiaplayFormat " + strDisplayformt);
                 }
 
-                Status = PrintStatus.Done;
-                OnStatusUpdate("Printing Done");
-            }
-            catch (Exception ex)
-            {
-                Status = PrintStatus.Failure;
-                OnStatusUpdate("Printing failed");
-                Log.Error("Print Job {0} FAIL: {1}", SOPInstanceUID.UID.Split('.').Last(), ex.Message);
-            }
-            finally
-            {
-
-            }
-        }
-
-        private void CombineImages(List<string> imgFiles,string finalImagePath, int row, int column)
-        {
-            try
-            {
                 int imageWidth = 0;
                 int imageHeight = 0;
-                foreach (string fileName in imgFiles)
+                List<Bitmap> images = new List<Bitmap>();
+                foreach (var item in filmBox.BasicImageBoxes)
                 {
-                    if (File.Exists(fileName))
+                    if (item != null && item.ImageSequence != null && item.ImageSequence.Contains(DicomTag.PixelData))
                     {
-                        Image img = Image.FromFile(fileName);
-                        imageHeight =   img.Height;
-                        imageWidth =   img.Width;
-                        img.Dispose();
-                        break;
+                        var image = new DicomImage(item.ImageSequence);      
+                        Bitmap bitmap = image.RenderImage().AsBitmap();
+
+                        imageWidth = bitmap.Width;
+                        imageHeight = bitmap.Height;
+
+                        images.Add(bitmap);
                     }
                 }
 
-                int jpgWidth = column * imageWidth;
-                int jpgHeight = row * imageHeight;
-
-                Bitmap combinedImage = new Bitmap(jpgWidth, jpgHeight);
+                Bitmap combinedImage = new Bitmap(column * imageWidth, row * imageHeight);
                 Graphics g = Graphics.FromImage(combinedImage);
                 g.Clear(SystemColors.AppWorkspace);
+
                 int imageIndex = 0;
                 for (int rowIndex = 0; rowIndex < row; rowIndex++)
                 {
                     for (int columnIndex = 0; columnIndex < column; columnIndex++)
                     {
-                        string fileName = imgFiles[imageIndex++];
-                        if (File.Exists(fileName))
+                        if(imageIndex < images.Count)
                         {
-                            Image img = Image.FromFile(fileName);
-                            g.DrawImage(img, new Point(columnIndex * imageWidth, rowIndex * imageHeight));
-                            img.Dispose();
+                            Bitmap bmp = images[imageIndex];
+                            g.DrawImage(bmp, new Point(columnIndex * imageWidth, rowIndex * imageHeight));
+                            bmp.Dispose();
                         }
                         else
                         {
-                            //Draw a black background Image
                             Bitmap blackBmp = new Bitmap(imageWidth, imageHeight);
                             Graphics blackGraphic = Graphics.FromImage(blackBmp);
-                            blackGraphic.FillRectangle(Brushes.Black, new Rectangle(0, 0, imageWidth, imageHeight));   
+                            blackGraphic.FillRectangle(Brushes.Black, new Rectangle(0, 0, imageWidth, imageHeight));
                             g.DrawImage(blackBmp, new Point(columnIndex * imageWidth, rowIndex * imageHeight));
                             blackBmp.Dispose();
                         }
+
+                        imageIndex++;
                     }
                 }
                 g.Dispose();
-                combinedImage.Save(finalImagePath, System.Drawing.Imaging.ImageFormat.Jpeg);
+                combinedImage.Save(combinedJpgFile, System.Drawing.Imaging.ImageFormat.Jpeg);
                 combinedImage.Dispose();
             }
             catch (Exception ex)
             {
                 Log.Error("Exception When Combine JPEG Image: {@error}", ex);
             }
-            finally
-            {
-                foreach (string fileName in imgFiles)
-                {
-                    if (File.Exists(fileName))
-                    {
-                        File.Delete(fileName);
-                    }
-                }
-            }
-        }
-        private void OnPrintPage(object sender, PrintPageEventArgs e)
-        {
-            _currentFilmBox.Print(e.Graphics, e.MarginBounds, 100);
-
-            _currentFilmBox = null;
-            _currentPage++;
-
-            e.HasMorePages = _currentPage < FilmBoxFolderList.Count;
-        }
-
-        private void OnQueryPageSettings(object sender, QueryPageSettingsEventArgs e)
-        {
-            OnStatusUpdate(string.Format("Printing film {0} of {1}", _currentPage + 1, FilmBoxFolderList.Count));
-            var filmBoxFolder = string.Format("{0}\\{1}", PrintJobFolder, FilmBoxFolderList[_currentPage]);
-            var filmSession = FilmSession.Load(string.Format("{0}\\FilmSession.dcm", filmBoxFolder));
-            _currentFilmBox = FilmBox.Load(filmSession, filmBoxFolder);
-
-            e.PageSettings.Margins.Left = 25;
-            e.PageSettings.Margins.Right = 25;
-            e.PageSettings.Margins.Top = 25;
-            e.PageSettings.Margins.Bottom = 25;
-
-            e.PageSettings.Landscape = _currentFilmBox.FilmOrienation == "LANDSCAPE";
         }
 
         private void DeleteJobFolder()
@@ -568,39 +419,11 @@ namespace PrintSCP
 
             if (StatusUpdate != null)
             {
-                var args = new PrintStatusEventArgs(Status, info, FilmSessionLabel, PrinterName);
+                var args = new PrintStatusEventArgs((ushort)Status, info, FilmSessionLabel, PrinterName);
                 StatusUpdate(this, args);
             }
         }
 
         #endregion
-
-        #region Helper Method
-        private void GetDisplayFormat(string strDisplayformt, ref int row, ref int column)
-        {
-            try
-            {
-                string[] dispalyformatArray = Regex.Split(strDisplayformt, @"\\");
-                if (dispalyformatArray[1] != null)
-                {
-                    string[] displayformatValue = Regex.Split(dispalyformatArray[1],@",");
-                    if (displayformatValue[0] != null && displayformatValue[1] != null)
-                    {
-                        column = Convert.ToInt32(displayformatValue[0]);
-                        row = Convert.ToInt32(displayformatValue[1]);
-                    }
-                }
-                else
-                {
-                    Log.Error("Error When GetDisplayFormat with DiaplayFormat {0}", strDisplayformt);
-                }
-            }
-            catch (Exception ex)
-            {
-                Log.Error("Exception When GetDisplayFormat with DiaplayFormat {0}: {@error}", strDisplayformt,ex);
-            }
-        }
-        #endregion
-
     }
 }

@@ -12,19 +12,25 @@ namespace PrintSCP
 {
     public enum PrintSCPType
     {
-        OnlyGreyScale, //
-        OnlyColor, //
-        Both //
+        GrayScale = 1, //
+        Colours, //
+        GrayScaleColours //
+    }
+
+
+    public class ReplaceTag
+    {
+        public string TagKey 
     }
 
     public class PrintSCPService : DicomService, IDicomServiceProvider, IDicomNServiceProvider, IDicomCEchoProvider
     {
         #region static Fields/Properties
 
-        private static PrintSCPType _scpType = PrintSCPType.OnlyGreyScale;
+        private static PrintSCPType _scpType = PrintSCPType.GrayScale;
         private static int _port = 8111;
         private static string _aeTitle = "PrintSCPService";
-        private static string _imageFolder = @"D:\PrintImages";
+        private static string _jobFolder = @"D:\PrintImages";
 
         private static DicomServer<PrintSCPService> _server;
 
@@ -49,16 +55,16 @@ namespace PrintSCP
             set { _scpType = value; }
         }
 
-        public static string LogFolder
+        public static string LogPath
         {
             get;
             set;
         }
 
-        public static string ImageFolder
+        public static string DicomPath
         {
-            get { return _imageFolder; }
-            set { _imageFolder = value; }
+            get { return _jobFolder; }
+            set { _jobFolder = value; }
         }
 
         public static List<string> ReplaceTags
@@ -171,7 +177,7 @@ namespace PrintSCP
         {
             this.Logger.Info("Received association request from AE: {0} with IP: {1} ", association.CallingAE, RemoteIP);
 
-            if (Printer.PrinterAet != association.CalledAE)
+            if (AETitle != association.CalledAE)
             {
                 this.Logger.Error(
                     "Association with {0} rejected since requested printer {1} not found",
@@ -185,7 +191,7 @@ namespace PrintSCP
             }
 
             CallingAE = association.CallingAE;
-            CalledAE = Printer.PrinterAet;
+            CalledAE = association.CalledAE;
 
             foreach (var pc in association.PresentationContexts)
             {
@@ -211,6 +217,7 @@ namespace PrintSCP
                         "Requested abstract syntax {abstractSyntax} from {callingAE} not supported",
                         pc.AbstractSyntax,
                         association.CallingAE);
+
                     pc.SetResult(DicomPresentationContextResult.RejectAbstractSyntaxNotSupported);
                 }
             }

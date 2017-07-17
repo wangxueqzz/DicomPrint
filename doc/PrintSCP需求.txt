@@ -1,0 +1,64 @@
+PrintSCP模块
+
+主程序通过实例化PrintSCP模块，建立一个PrintSCP服务，用于接收Dicom打印任务。
+
+1. 主程序在实例化PrintSCP时，传递PrintSCP.Parameters.Creator对象变量给PrintSCP模块。
+
+   *此PrintSCP对象是单线程还是多线程，我想听听您的意见，主要是考虑到多线程并发时，触发事件会不会有问题。我建议采用单线程，即同一时刻只能接收一个DICOM打印任务。
+
+2. 当PrintSCP接收到DICOM打印任务后，做以下工作：
+
+(1) 检查DicomPath指定文件夹是否存在，如果不存在，则创建。
+    DicomPath例子：D:\DicomStorage\yy\MM\dd\IP\AE\，其中：
+    yy表示：年，如：2017
+    MM表示：月，如：07
+    dd表示：日，如：17
+    IP表示：Calling IP
+    AE表示：Calling AE Title
+
+(2) 在指定文件夹下创建“Dicom打印任务UID”文件夹
+
+(3) 创建DicomTag文件，Dicom图像文件，与Dicom图像文件文件名一致的JPEG文件。
+
+    1)遍历ReplaceTag数组，发现当前Dicom打印任务中有Tag的Key符合，则替换Value值。
+    2)根据ImageDisplayFormat(2010,0010) / Rows(0028,0010) / Columns(0028,0011)，将JPEG合并为View.JPEG文件。这里需要考虑非标准布局，您只需要做两三个针对非标准布局的范例，后面我根据在现场遇到的情况自行添加非标准布局合并JPEG文件代码。
+
+(3) 通过事件返回PrintSCP.Parameters.Receiver参数
+
+class PrintSCP
+{
+
+	Class Parameters
+	{
+        	class Creator
+        	{
+	            string AETitle { get; set; }
+        	    string Port { get; set; }
+	            enum SCPType
+        	    {
+	                Grayscale = 1,        //当放射设备电脑的PrintSCU询问是否能接收灰度图和彩色图时，回复只接收灰度Dicom打印任务
+        	        Colours = 2,          //当放射设备电脑的PrintSCU询问是否能接收灰度图和彩色图时，回复只接收彩色Dicom打印任务
+                	GrayscaleColours = 3  //当放射设备电脑的PrintSCU询问是否能接收灰度图和彩色图时，回复灰度/彩色Dicom打印任务都能接收
+	            }
+        	    string DicomPath { get; set; } 
+	            string LogPath { get; set; } //日志路径
+        	    ReplaceTag[] ReplaceTag { get; set; } //用于将接收到的Dicom打印任务中指定的Key的值替换的对象数组
+	        }
+
+	        class Receiver
+        	{
+	            string CallingAETitle { get; set; }
+        	    string CallingIP { get; set; } 
+	            string FilmSize { get; set; } //胶片尺寸
+        	    string Path { get; set; }  //完整的路径，包含“Dicom打印任务UID”文件夹
+		    string DicomFile{ get; set; } //DicomTag文件名，用于发送给PrintSCU，进行Dicom打印
+	        }
+
+	        class ReplaceTag
+        	{
+	            string TagKey { get; set; }
+        	    string TagType { get; set; }
+	            string TagValue { get; set; } //是否应该用string类型，我不清楚，请指正
+        	}
+	}
+}

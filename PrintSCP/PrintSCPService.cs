@@ -1,5 +1,4 @@
 ﻿using Dicom;
-using Dicom.Log;
 using Dicom.Network;
 using Dicom.Printing;
 using System;
@@ -7,9 +6,30 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Common;
 
 namespace PrintSCP
 {
+    public class PrintTask : EventArgs
+    {
+        public string CallingAETitle { get; set; }
+
+        public string CallingIP { get; set; }
+
+        public string FilmSize { get; set; }
+
+        /// <summary>
+        /// The folder contains the print tasks' dicom files/combined jpg, etc.
+        /// </summary>
+        public string TaskPath { get; set; }
+
+        public bool IsFailed { get; set; }
+
+        public string ErrorMessage { get; set; }
+    }
+   
+    public delegate void PrintTaskEventHandler(PrintTask arg);
+
     public enum PrintSCPType
     {
         GrayScale = 1,
@@ -56,8 +76,10 @@ namespace PrintSCP
         private static string _logPath = @"C:\PrintSCPLog";
 
         private static List<ReplaceTag> _replaceTags;
-
         private static DicomServer<PrintSCPService> _server;
+
+        //the event used to inform client when there is a new print task.
+        public static event PrintTaskEventHandler PrintTaskEvent;
 
         public static int Port
         {
@@ -154,13 +176,16 @@ namespace PrintSCP
         public static void Start()
         {
             LogManager.Instance.SetLogFolder(LogPath);
-
-            _server = new DicomServer<PrintSCPService>(Port);
+            if(_server == null)
+            {
+                _server = new DicomServer<PrintSCPService>(Port);
+            }
         }
 
         public static void Stop()
         {
             _server.Dispose();
+            _server = null;
         }
 
         #endregion
@@ -200,11 +225,11 @@ namespace PrintSCP
 
         public void OnReceiveAssociationRequest(DicomAssociation association)
         {
-            this.Logger.Info("Received association request from AE: {0} with IP: {1} ", association.CallingAE, CallingIP);
+            LogManager.Instance.Info("Received association request from AE: {0} with IP: {1} ", association.CallingAE, CallingIP);
 
             if (AETitle != association.CalledAE)
             {
-                this.Logger.Error(
+                LogManager.Instance.Error(
                     "Association with {0} rejected since requested printer {1} not found",
                     association.CallingAE,
                     association.CalledAE);
@@ -220,34 +245,43 @@ namespace PrintSCP
 
             foreach (var pc in association.PresentationContexts)
             {
+                bool bAccept = false;
+
                 if (pc.AbstractSyntax == DicomUID.Verification
-                    || pc.AbstractSyntax == DicomUID.BasicGrayscalePrintManagementMetaSOPClass
-                    || pc.AbstractSyntax == DicomUID.BasicColorPrintManagementMetaSOPClass
                     || pc.AbstractSyntax == DicomUID.PrinterSOPClass
                     || pc.AbstractSyntax == DicomUID.BasicFilmSessionSOPClass
-                    || pc.AbstractSyntax == DicomUID.BasicFilmBoxSOPClass
-                    || pc.AbstractSyntax == DicomUID.BasicGrayscaleImageBoxSOPClass
+                    || pc.AbstractSyntax == DicomUID.BasicFilmBoxSOPClass)
+                {
+                    bAccept = true;
+                }
+                else if (pc.AbstractSyntax == DicomUID.BasicGrayscalePrintManagementMetaSOPClass
+                    || pc.AbstractSyntax == DicomUID.BasicGrayscaleImageBoxSOPClass)
+                {
+                    bAccept = (PrintSCPService.SCPType == PrintSCPType.GrayScale || PrintSCPService.SCPType == PrintSCPType.GrayScaleColours);
+                }
+                else if(pc.AbstractSyntax == DicomUID.BasicColorPrintManagementMetaSOPClass
                     || pc.AbstractSyntax == DicomUID.BasicColorImageBoxSOPClass)
                 {
-                    pc.AcceptTransferSyntaxes(AcceptedTransferSyntaxes);
+                    bAccept = (PrintSCPService.SCPType == PrintSCPType.Colours || PrintSCPService.SCPType == PrintSCPType.GrayScaleColours);
                 }
                 else if (pc.AbstractSyntax == DicomUID.PrintJobSOPClass)
                 {
-                    pc.AcceptTransferSyntaxes(AcceptedTransferSyntaxes);
+                    bAccept = true;
                     _sendEventReports = true;
+                }
+
+                if (bAccept)
+                {
+                    pc.AcceptTransferSyntaxes(AcceptedTransferSyntaxes);
                 }
                 else
                 {
-                    this.Logger.Warn(
-                        "Requested abstract syntax {abstractSyntax} from {callingAE} not supported",
-                        pc.AbstractSyntax,
-                        association.CallingAE);
-
+                    LogManager.Instance.Warn("Requested abstract syntax {0} from {1} not supported", pc.AbstractSyntax, association.CallingAE);
                     pc.SetResult(DicomPresentationContextResult.RejectAbstractSyntaxNotSupported);
                 }
             }
 
-            this.Logger.Info("Accepted association request from {callingAE}", association.CallingAE);
+            LogManager.Instance.Info("Accepted association request from {0}", association.CallingAE);
             SendAssociationAccept(association);
         }
 
@@ -259,7 +293,7 @@ namespace PrintSCP
 
         public void OnReceiveAbort(DicomAbortSource source, DicomAbortReason reason)
         {
-            this.Logger.Error("Received abort from {0}, reason is {1}", source, reason);
+            LogManager.Instance.Error("Received abort from {0}, reason is {1}", source, reason);
         }
 
         public void OnConnectionClosed(Exception exception)
@@ -273,7 +307,7 @@ namespace PrintSCP
 
         public DicomCEchoResponse OnCEchoRequest(DicomCEchoRequest request)
         {
-            this.Logger.Info("Received verification request from AE {0} with IP: {1}", CallingAE, CallingIP);
+            LogManager.Instance.Info("Received verification request from AE {0} with IP: {1}", CallingAE, CallingIP);
             return new DicomCEchoResponse(request, DicomStatus.Success);
         }
 
@@ -304,7 +338,7 @@ namespace PrintSCP
         {
             if (_filmSession != null)
             {
-                this.Logger.Error("Attemted to create new basic film session on association with {0}", CallingAE);
+                LogManager.Instance.Error("Attemted to create new basic film session on association with {0}", CallingAE);
                 SendAbort(DicomAbortSource.ServiceProvider, DicomAbortReason.NotSpecified);
                 return new DicomNCreateResponse(request, DicomStatus.NoSuchObjectInstance);
             }
@@ -315,7 +349,7 @@ namespace PrintSCP
 
             _filmSession = new FilmSession(request.SOPClassUID, request.SOPInstanceUID, request.Dataset, isColor);
 
-            this.Logger.Info("Create new film session {0}", _filmSession.SOPInstanceUID.UID);
+            LogManager.Instance.Info("Create new film session {0}", _filmSession.SOPInstanceUID.UID);
 
             var response = new DicomNCreateResponse(request, DicomStatus.Success);
             response.Command.Add(DicomTag.AffectedSOPInstanceUID, _filmSession.SOPInstanceUID);
@@ -326,7 +360,7 @@ namespace PrintSCP
         {
             if (_filmSession == null)
             {
-                this.Logger.Error("A basic film session does not exist for this association {0}", CallingAE);
+                LogManager.Instance.Error("A basic film session does not exist for this association {0}", CallingAE);
                 SendAbort(DicomAbortSource.ServiceProvider, DicomAbortReason.NotSpecified);
                 return new DicomNCreateResponse(request, DicomStatus.NoSuchObjectInstance);
 
@@ -336,12 +370,12 @@ namespace PrintSCP
 
             if (!filmBox.Initialize())
             {
-                this.Logger.Error("Failed to initialize requested film box {0}", filmBox.SOPInstanceUID.UID);
+                LogManager.Instance.Error("Failed to initialize requested film box {0}", filmBox.SOPInstanceUID.UID);
                 SendAbort(DicomAbortSource.ServiceProvider, DicomAbortReason.NotSpecified);
                 return new DicomNCreateResponse(request, DicomStatus.ProcessingFailure);
             }
 
-            this.Logger.Info("Created new film box {0}", filmBox.SOPInstanceUID.UID);
+            LogManager.Instance.Info("Created new film box {0}", filmBox.SOPInstanceUID.UID);
 
             var response = new DicomNCreateResponse(request, DicomStatus.Success);
             response.Command.Add(DicomTag.AffectedSOPInstanceUID, filmBox.SOPInstanceUID);
@@ -377,7 +411,7 @@ namespace PrintSCP
         {
             if (_filmSession == null)
             {
-                this.Logger.Error("Can't delete a basic film session doesnot exist for this association {0}", CallingAE);
+                LogManager.Instance.Error("Can't delete a basic film session doesnot exist for this association {0}", CallingAE);
                 return new DicomNDeleteResponse(request, DicomStatus.NoSuchObjectInstance);
             }
 
@@ -400,13 +434,13 @@ namespace PrintSCP
         {
             if (_filmSession == null)
             {
-                this.Logger.Error("Can't delete a basic film session doesnot exist for this association {0}", CallingAE);
+                LogManager.Instance.Error("Can't delete a basic film session doesnot exist for this association {0}", CallingAE);
                 return new DicomNDeleteResponse(request, DicomStatus.NoSuchObjectInstance);
             }
 
             if (!request.SOPInstanceUID.Equals(_filmSession.SOPInstanceUID))
             {
-                this.Logger.Error(
+                LogManager.Instance.Error(
                     "Can't delete a basic film session with instace UID {0} doesnot exist for this association {1}",
                     request.SOPInstanceUID.UID,
                     CallingAE);
@@ -449,16 +483,16 @@ namespace PrintSCP
         {
             if (_filmSession == null)
             {
-                this.Logger.Error("A basic film session does not exist for this association {0}", CallingAE);
+                LogManager.Instance.Error("A basic film session does not exist for this association {0}", CallingAE);
                 return new DicomNSetResponse(request, DicomStatus.NoSuchObjectInstance);
             }
 
-            this.Logger.Info("Set image box {0}", request.SOPInstanceUID.UID);
+            LogManager.Instance.Info("Set image box {0}", request.SOPInstanceUID.UID);
 
             var imageBox = _filmSession.FindImageBox(request.SOPInstanceUID);
             if (imageBox == null)
             {
-                this.Logger.Error(
+                LogManager.Instance.Error(
                     "Received N-SET request for invalid image box instance {0} for this association {1}",
                     request.SOPInstanceUID.UID,
                     CallingAE);
@@ -474,16 +508,16 @@ namespace PrintSCP
         {
             if (_filmSession == null)
             {
-                this.Logger.Error("A basic film session does not exist for this association {0}", CallingAE);
+                LogManager.Instance.Error("A basic film session does not exist for this association {0}", CallingAE);
                 return new DicomNSetResponse(request, DicomStatus.NoSuchObjectInstance);
             }
 
-            this.Logger.Info("Set film box {0}", request.SOPInstanceUID.UID);
+            LogManager.Instance.Info("Set film box {0}", request.SOPInstanceUID.UID);
             var filmBox = _filmSession.FindFilmBox(request.SOPInstanceUID);
 
             if (filmBox == null)
             {
-                this.Logger.Error(
+                LogManager.Instance.Error(
                     "Received N-SET request for invalid film box {0} from {1}",
                     request.SOPInstanceUID.UID,
                     CallingAE);
@@ -505,11 +539,11 @@ namespace PrintSCP
         {
             if (_filmSession == null || _filmSession.SOPInstanceUID.UID != request.SOPInstanceUID.UID)
             {
-                this.Logger.Error("A basic film session does not exist for this association {0}", CallingAE);
+                LogManager.Instance.Error("A basic film session does not exist for this association {0}", CallingAE);
                 return new DicomNSetResponse(request, DicomStatus.NoSuchObjectInstance);
             }
 
-            this.Logger.Info("Set film session {0}", request.SOPInstanceUID.UID);
+            LogManager.Instance.Info("Set film session {0}", request.SOPInstanceUID.UID);
             request.Dataset.CopyTo(_filmSession);
 
             return new DicomNSetResponse(request, DicomStatus.Success);
@@ -523,7 +557,7 @@ namespace PrintSCP
         {
             lock (_synchRoot)
             {
-                this.Logger.Info(request.ToString(true));
+                LogManager.Instance.Info(request.ToString(true));
 
                 if (request.SOPClassUID == DicomUID.PrinterSOPClass
                     && request.SOPInstanceUID == DicomUID.PrinterSOPInstance)
@@ -580,7 +614,7 @@ namespace PrintSCP
             var response = new DicomNGetResponse(request, DicomStatus.Success);
             response.Dataset = ds;
 
-            this.Logger.Info(response.ToString(true));
+            LogManager.Instance.Info(response.ToString(true));
             return response;
         }
 
@@ -642,7 +676,7 @@ namespace PrintSCP
         {
             if (_filmSession == null)
             {
-                this.Logger.Error("A basic film session does not exist for this association {0}", CallingAE);
+                LogManager.Instance.Error("A basic film session does not exist for this association {0}", CallingAE);
                 return new DicomNActionResponse(request, DicomStatus.InvalidObjectInstance);
             }
 
@@ -653,12 +687,12 @@ namespace PrintSCP
                     var filmBoxList = new List<FilmBox>();
                     if (request.SOPClassUID == DicomUID.BasicFilmSessionSOPClass && request.ActionTypeID == 0x0001)
                     {
-                        this.Logger.Info("Creating new print job for film session {0}", _filmSession.SOPInstanceUID.UID);
+                        LogManager.Instance.Info("Creating new print job for film session {0}", _filmSession.SOPInstanceUID.UID);
                         filmBoxList.AddRange(_filmSession.BasicFilmBoxes);
                     }
                     else if (request.SOPClassUID == DicomUID.BasicFilmBoxSOPClass && request.ActionTypeID == 0x0001)
                     {
-                        this.Logger.Info("Creating new print job for film box {0}", request.SOPInstanceUID.UID);
+                        LogManager.Instance.Info("Creating new print job for film box {0}", request.SOPInstanceUID.UID);
 
                         var filmBox = _filmSession.FindFilmBox(request.SOPInstanceUID);
                         if (filmBox != null)
@@ -667,7 +701,7 @@ namespace PrintSCP
                         }
                         else
                         {
-                            this.Logger.Error(
+                            LogManager.Instance.Error(
                                 "Received N-ACTION request for invalid film box {0} from {1}",
                                 request.SOPInstanceUID.UID,
                                 CallingAE);
@@ -678,7 +712,7 @@ namespace PrintSCP
                     {
                         if (request.ActionTypeID != 0x0001)
                         {
-                            this.Logger.Error(
+                            LogManager.Instance.Error(
                                 "Received N-ACTION request for invalid action type {0} from {1}",
                                 request.ActionTypeID,
                                 CallingAE);
@@ -686,7 +720,7 @@ namespace PrintSCP
                         }
                         else
                         {
-                            this.Logger.Error(
+                            LogManager.Instance.Error(
                                 "Received N-ACTION request for invalid SOP class {0} from {1}",
                                 request.SOPClassUID,
                                 CallingAE);
@@ -698,6 +732,19 @@ namespace PrintSCP
                     printJob.StatusUpdate += OnPrintJobStatusUpdate;
 
                     printJob.Print(filmBoxList);
+
+                    PrintTask arg = new PrintTask();
+                    arg.CallingAETitle = CallingAE;
+                    arg.CallingIP = CallingIP;
+                    arg.FilmSize = filmBoxList[0].FilmSizeID;//"TODO";
+                    arg.TaskPath = printJob.PrintJobFolder;
+                    arg.IsFailed = printJob.IsFailed;
+                    arg.ErrorMessage = printJob.ErrorMessage;
+
+                    if (PrintSCPService.PrintTaskEvent != null)
+                    {
+                        PrintSCPService.PrintTaskEvent(arg);
+                    }
 
                     if (!printJob.IsFailed)
                     {
@@ -725,12 +772,12 @@ namespace PrintSCP
                 }
                 catch (Exception ex)
                 {
-                    this.Logger.Error(
+                    LogManager.Instance.Error(
                         "Error occured during N-ACTION {0} for SOP class {1} and instance {2}",
                         request.ActionTypeID,
                         request.SOPClassUID.UID,
                         request.SOPInstanceUID.UID);
-                    this.Logger.Error(ex.Message);
+                    LogManager.Instance.Error(ex.Message);
                     return new DicomNActionResponse(request, DicomStatus.ProcessingFailure);
                 }
             }

@@ -13,6 +13,8 @@ namespace Demo
 {
     public partial class Form1 : Form
     {
+        private List<PrintTask> _printTasks = new List<PrintTask>();
+
         public Form1()
         {
             InitializeComponent();
@@ -29,10 +31,24 @@ namespace Demo
             PrintSCPService.DicomPath = "D:\\PrintFolder";
             PrintSCPService.LogPath = "C:\\PrintSCPLog";
             PrintSCPService.Port = 8431;
-            PrintSCPService.SCPType = PrintSCPType.GrayScale;
+            PrintSCPService.SCPType = PrintSCPType.GrayScaleColours;
 
+            PrintSCPService.PrintTaskEvent += PrintSCPService_PrintTaskEvent;
+            
             PrintSCPService.Start();
 
+            statusLabel.Text = "Print SCP Service started!";
+        }
+
+        private void PrintSCPService_PrintTaskEvent(PrintTask task)
+        {
+            Invoke((MethodInvoker)(() =>
+            {
+                _printTasks.Add(task);
+
+                bindingSource1.DataSource = null;
+                bindingSource1.DataSource = _printTasks;
+            }));
         }
     }
 }

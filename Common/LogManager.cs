@@ -4,11 +4,11 @@ using System.Linq;
 using System.Text;
 using System.IO;
 
-namespace PrintSCP
+namespace Common
 {
     internal delegate void LogEventHanlder(string msg);
 
-    internal class LogManager
+    public class LogManager
     {
         internal event LogEventHanlder LogEvent;
 
@@ -44,7 +44,7 @@ namespace PrintSCP
         {
             if (string.IsNullOrEmpty(_strLogFilePath))
             {
-                _strLogFilePath = "c:\\PrintSCPLog";
+                _strLogFilePath = "c:\\DicomPrintLog";
             }
 
             if (!Directory.Exists(_strLogFilePath))
@@ -88,6 +88,11 @@ namespace PrintSCP
         }
 
         public void Info(string strMsg, params object[] values)
+        {
+            Log(strMsg, values);
+        }
+
+        public void Warn(string strMsg, params object[] values)
         {
             Log(strMsg, values);
         }

@@ -14,10 +14,11 @@ using System.Drawing;
 using Dicom.Imaging;
 using Dicom;
 using Dicom.Printing;
+using Common;
 
 namespace PrintSCP
 {
-    public class PrintStatusEventArgs : EventArgs
+    internal class PrintStatusEventArgs : EventArgs
     {
         public ushort EventTypeId { get; private set; }
         public string ExecutionStatusInfo { get; private set; }
@@ -27,13 +28,11 @@ namespace PrintSCP
         public PrintStatusEventArgs(
             ushort eventTypeId,
             string executionStatusInfo,
-            string filmSessionLabel,
-            string printerName)
+            string filmSessionLabel)
         {
             EventTypeId = eventTypeId;
             ExecutionStatusInfo = executionStatusInfo;
             FilmSessionLabel = filmSessionLabel;
-            PrinterName = printerName;
         }
     }
 
@@ -64,7 +63,7 @@ namespace PrintSCP
         {
             get
             {
-                return Status != PrintStatus.Failure;
+                return Status == PrintStatus.Failure;
             }
         }
 
@@ -81,7 +80,7 @@ namespace PrintSCP
             set;
         }
 
-        private string PrintJobFolder
+        internal string PrintJobFolder
         {
             get
             {
@@ -90,7 +89,7 @@ namespace PrintSCP
                 if (string.IsNullOrEmpty(_jobFolder))
                 {
                     DateTime dt = DateTime.Now;
-                    string strDate = string.Format(@"{0}\{1}\{2}", dt.Year, dt.Month, dt.Day);
+                    string strDate = string.Format(@"{0}\{1:D2}\{2:D2}", dt.Year, dt.Month, dt.Day);
                     _jobFolder = Path.Combine(PrintSCPService.DicomPath, strDate, CallingIP.ToString(), CallingAETitle, SOPInstanceUID.UID);
 
                     if (Directory.Exists(_jobFolder))
@@ -189,6 +188,7 @@ namespace PrintSCP
                 }
 
                 FilmSessionLabel = filmBoxList.First().FilmSession.FilmSessionLabel;
+                Status = PrintStatus.Done;
             }
             catch (Exception ex)
             {
@@ -278,12 +278,11 @@ namespace PrintSCP
 
         private void DeleteJobFolder()
         {
-            var folderInfo = new System.IO.DirectoryInfo(PrintJobFolder);
-            if (folderInfo.Exists)
+            if (Directory.Exists(PrintJobFolder))
             {
                 try
                 {
-                    folderInfo.Delete(true);
+                    Directory.Delete(PrintJobFolder, true);
                 }
                 catch { }
             }
@@ -304,7 +303,7 @@ namespace PrintSCP
 
             if (StatusUpdate != null)
             {
-                var args = new PrintStatusEventArgs((ushort)Status, info, FilmSessionLabel, "");
+                var args = new PrintStatusEventArgs((ushort)Status, info, FilmSessionLabel);
                 StatusUpdate(this, args);
             }
         }

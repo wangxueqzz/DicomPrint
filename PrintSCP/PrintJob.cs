@@ -45,7 +45,7 @@ namespace PrintSCP
         Failure = 4
     }
 
-    internal class PrintJob : DicomDataset
+    internal class PrintJob
     {
         #region Properties and Attributes
         
@@ -54,13 +54,32 @@ namespace PrintSCP
         private string _jobFolder;
         private readonly object _synchRoot = new object();
 
-        public bool SendNEventReport { get; set; }
+        public DicomUID SOPInstanceUID 
+        { 
+            get; 
+            private set; 
+        }
 
-        private IList<string> FilmBoxFolderList { get; set; }
+        public bool IsFailed
+        {
+            get
+            {
+                return Status != PrintStatus.Failure;
+            }
+        }
 
-        public Printer Printer { get; private set; }
+        public string ErrorMessage { get; set; }
 
-        private PrintStatus Status { get; set; }
+        public PrintStatus Status { get; set; }
+
+        /// <summary>
+        /// Additional information about Execution Status (2100,0020).
+        /// </summary>
+        public string ExecutionStatusInfo
+        {
+            get;
+            set;
+        }
 
         private string PrintJobFolder
         {
@@ -72,7 +91,7 @@ namespace PrintSCP
                 {
                     DateTime dt = DateTime.Now;
                     string strDate = string.Format(@"{0}\{1}\{2}", dt.Year, dt.Month, dt.Day);
-                    _jobFolder = Path.Combine(PrintSCPService.DicomPath, strDate, CallingIPAddress.ToString(), CallingAETitle, SOPInstanceUID.UID);
+                    _jobFolder = Path.Combine(PrintSCPService.DicomPath, strDate, CallingIP.ToString(), CallingAETitle, SOPInstanceUID.UID);
 
                     if (Directory.Exists(_jobFolder))
                     {
@@ -93,128 +112,17 @@ namespace PrintSCP
             }
         }
 
-        public Exception Error { get; private set; }
-
         public string FilmSessionLabel { get; private set; }
 
-        /// <summary>
-        /// Print job SOP instance UID
-        /// </summary>
-        public DicomUID SOPInstanceUID { get; private set; }
-
-        /// <summary>
-        /// Execution status of print job.
-        /// </summary>
-        /// <remarks>
-        /// Enumerated Values:
-        /// <list type="bullet">
-        /// <item><description>PENDING</description></item>
-        /// <item><description>PRINTING</description></item>
-        /// <item><description>DONE</description></item>
-        /// <item><description>FAILURE</description></item>
-        /// </list>
-        /// </remarks> 
-        public string ExecutionStatus
-        {
-            get
-            {
-                return Get(DicomTag.ExecutionStatus, string.Empty);
-            }
-            set
-            {
-                Add(DicomTag.ExecutionStatus, value);
-            }
-        }
-
-        /// <summary>
-        /// Additional information about Execution Status (2100,0020).
-        /// </summary>
-        public string ExecutionStatusInfo
-        {
-            get
-            {
-                return Get(DicomTag.ExecutionStatusInfo, string.Empty);
-            }
-            set
-            {
-                Add(DicomTag.ExecutionStatusInfo, value);
-            }
-        }
-
-        /// <summary>
-        /// Specifies the priority of the print job.
-        /// </summary>
-        /// <remarks>
-        /// Enumerated values:
-        /// <list type="bullet">
-        ///     <item><description>HIGH</description></item>
-        ///     <item><description>MED</description></item>
-        ///     <item><description>LOW</description></item>
-        /// </list>
-        /// </remarks>
-        public string PrintPriority
-        {
-            get
-            {
-                return Get(DicomTag.PrintPriority, "MED");
-            }
-            set
-            {
-                Add(DicomTag.PrintPriority, value);
-            }
-        }
-
-        /// <summary>
-        /// Date/Time of print job creation.
-        /// </summary>
-        public DateTime CreationDateTime
-        {
-            get
-            {
-                return this.GetDateTime(DicomTag.CreationDate, DicomTag.CreationTime);
-            }
-            set
-            {
-                Add(DicomTag.CreationDate, value);
-                Add(DicomTag.CreationTime, value);
-            }
-        }
-
-        /// <summary>
-        /// User defined name identifying the printer.
-        /// </summary>
-        public string PrinterName
-        {
-            get
-            {
-                return Get(DicomTag.PrinterName, string.Empty);
-            }
-            set
-            {
-                Add(DicomTag.PrinterName, value);
-            }
-        }
-
-        /// <summary>
-        /// DICOM Application Entity Title that issued the print operation.
-        /// </summary>
         public string CallingAETitle
         {
-            get
-            {
-                return Get(DicomTag.Originator, string.Empty);
-            }
-            set
-            {
-                Add(DicomTag.Originator, value);
-            }
+            get;
+            set;
         }
 
         public string CalledAETitle { get;set;}
 
-        public IPAddress CallingIPAddress { get; set; }
-
-        private Dicom.Log.Logger Log { get; set; }
+        public string CallingIP { get; set; }
 
         public event EventHandler<PrintStatusEventArgs> StatusUpdate;
 
@@ -227,16 +135,9 @@ namespace PrintSCP
         /// be generated
         /// </summary>
         /// <param name="sopInstance">New print job SOP instance uID</param>
-        public PrintJob(DicomUID sopInstance, Printer printer, IPAddress callingIPAddress, string callingAETitle, string calledAETitle, Dicom.Log.Logger log)
+        public PrintJob(DicomUID sopInstance, string callingIP, string callingAETitle, string calledAETitle)
             : base()
         {
-            if (printer == null)
-            {
-                throw new ArgumentNullException("printer");
-            }
-
-            Log = log;
-
             if (sopInstance == null || sopInstance.UID == string.Empty)
             {
                 SOPInstanceUID = DicomUID.Generate();
@@ -246,23 +147,11 @@ namespace PrintSCP
                 SOPInstanceUID = sopInstance;
             }
 
-            this.Add(DicomTag.SOPClassUID, SOPClassUID);
-            this.Add(DicomTag.SOPInstanceUID, SOPInstanceUID);
-
-            Printer = printer;
             Status = PrintStatus.Pending;
-            PrinterName = Printer.PrinterAet;
 
             CallingAETitle = callingAETitle;
             CalledAETitle = calledAETitle;
-            CallingIPAddress = callingIPAddress;
-
-            if (CreationDateTime == DateTime.MinValue)
-            {
-                CreationDateTime = DateTime.Now;
-            }
-
-            FilmBoxFolderList = new List<string>();
+            CallingIP = callingIP;
         }
 
         #endregion
@@ -303,8 +192,9 @@ namespace PrintSCP
             }
             catch (Exception ex)
             {
-                Error = ex;
                 Status = PrintStatus.Failure;
+                ErrorMessage = ex.Message;
+
                 OnStatusUpdate("Print failed");
                 DeleteJobFolder();
             }
@@ -318,7 +208,7 @@ namespace PrintSCP
                 string strDisplayformt = filmBox.ImageDisplayFormat;
 
                 string[] dispalyformatArray = Regex.Split(strDisplayformt, @"\\");
-                if (dispalyformatArray.Length > 2)
+                if (dispalyformatArray.Length > 1)
                 {
                     string[] displayformatValue = Regex.Split(dispalyformatArray[1], @",");
                     if (displayformatValue[0] != null && displayformatValue[1] != null)
@@ -382,7 +272,7 @@ namespace PrintSCP
             }
             catch (Exception ex)
             {
-                Log.Error("Exception When Combine JPEG Image: {@error}", ex);
+                LogManager.Instance.Error("Exception When Combine JPEG Image: {@error}", ex);
             }
         }
 
@@ -399,27 +289,22 @@ namespace PrintSCP
             }
         }
 
-        #endregion
-
-        #region Notification Methods
-
         protected virtual void OnStatusUpdate(string info)
         {
-            ExecutionStatus = Status.ToString();
             ExecutionStatusInfo = info;
 
             if (Status != PrintStatus.Failure)
             {
-                Log.Info("Print Job {0} Status {1}: {2}", SOPInstanceUID.UID.Split('.').Last(), Status, info);
+                LogManager.Instance.Info("Print Job {0} Status {1}: {2}", SOPInstanceUID.UID.Split('.').Last(), Status, info);
             }
             else
             {
-                Log.Error("Print Job {0} Status {1}: {2}", SOPInstanceUID.UID.Split('.').Last(), Status, info);
+                LogManager.Instance.Error("Print Job {0} Status {1}: {2}", SOPInstanceUID.UID.Split('.').Last(), Status, info);
             }
 
             if (StatusUpdate != null)
             {
-                var args = new PrintStatusEventArgs((ushort)Status, info, FilmSessionLabel, PrinterName);
+                var args = new PrintStatusEventArgs((ushort)Status, info, FilmSessionLabel, "");
                 StatusUpdate(this, args);
             }
         }

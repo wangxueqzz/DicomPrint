@@ -32,16 +32,10 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Dicom.Core">
-      <HintPath>..\lib\release\Dicom.Core.dll</HintPath>
-    </Reference>
-    <Reference Include="Dicom.Log4Net">
-      <HintPath>..\lib\release\Dicom.Log4Net.dll</HintPath>
+      <HintPath>..\lib\Dicom.Core.dll</HintPath>
     </Reference>
     <Reference Include="Dicom.Platform">
-      <HintPath>..\lib\release\Dicom.Platform.dll</HintPath>
-    </Reference>
-    <Reference Include="log4net">
-      <HintPath>..\lib\release\log4net.dll</HintPath>
+      <HintPath>..\lib\Dicom.Platform.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -53,6 +47,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="LogManager.cs" />
     <Compile Include="PrintSCUService.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

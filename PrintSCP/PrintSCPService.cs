@@ -12,15 +12,37 @@ namespace PrintSCP
 {
     public enum PrintSCPType
     {
-        GrayScale = 1, //
-        Colours, //
-        GrayScaleColours //
+        GrayScale = 1,
+        Colours,
+        GrayScaleColours
     }
-
 
     public class ReplaceTag
     {
-        public string TagKey 
+        public ReplaceTag(int group, int element, string value)
+        {
+            TagGroup = group;
+            TagElement = element;
+            Value = value;
+        }
+
+        public int TagGroup
+        {
+            get;
+            set;
+        }
+
+        public int TagElement
+        {
+            get;
+            set;
+        }
+
+        public string Value
+        {
+            get;
+            set;
+        }
     }
 
     public class PrintSCPService : DicomService, IDicomServiceProvider, IDicomNServiceProvider, IDicomCEchoProvider
@@ -30,7 +52,10 @@ namespace PrintSCP
         private static PrintSCPType _scpType = PrintSCPType.GrayScale;
         private static int _port = 8111;
         private static string _aeTitle = "PrintSCPService";
-        private static string _jobFolder = @"D:\PrintImages";
+        private static string _printFileFolder = @"D:\PrintImages";
+        private static string _logPath = @"C:\PrintSCPLog";
+
+        private static List<ReplaceTag> _replaceTags;
 
         private static DicomServer<PrintSCPService> _server;
 
@@ -57,26 +82,26 @@ namespace PrintSCP
 
         public static string LogPath
         {
-            get;
-            set;
+            get { return _logPath; }
+            set { _logPath = value; }
         }
 
         public static string DicomPath
         {
-            get { return _jobFolder; }
-            set { _jobFolder = value; }
+            get { return _printFileFolder; }
+            set { _printFileFolder = value; }
         }
 
-        public static List<string> ReplaceTags
+        public static List<ReplaceTag> ReplaceTags
         {
-            get;
-            set;
-        }
-
-        internal static Printer Printer
-        {
-            get;
-            set;
+            get
+            {
+                return _replaceTags;
+            }
+            set
+            {
+                _replaceTags = value;
+            }
         }
 
         internal static readonly DicomTransferSyntax[] AcceptedTransferSyntaxes = new DicomTransferSyntax[]
@@ -116,7 +141,7 @@ namespace PrintSCP
             protected set;
         }
 
-        public System.Net.IPAddress RemoteIP
+        public string CallingIP
         {
             get;
             private set;
@@ -128,7 +153,8 @@ namespace PrintSCP
 
         public static void Start()
         {
-            Printer = new Printer(AETitle);
+            LogManager.Instance.SetLogFolder(LogPath);
+
             _server = new DicomServer<PrintSCPService>(Port);
         }
 
@@ -147,14 +173,12 @@ namespace PrintSCP
             if (pi != null)
             {
                 var endPoint = ((System.Net.Sockets.Socket)pi.GetValue(stream, null)).RemoteEndPoint as System.Net.IPEndPoint;
-                RemoteIP = endPoint.Address;
+                CallingIP = endPoint.Address.ToString();
             }
             else
             {
-                RemoteIP = new System.Net.IPAddress(new byte[] { 127, 0, 0, 1 });
+                CallingIP = "127, 0, 0, 1";
             }
-
-            this.Logger = LogManager.GetLogger("Dicom.Printing");
         }
 
         public void Clean()
@@ -163,6 +187,7 @@ namespace PrintSCP
             {
                 if (_filmSession != null)
                 {
+                    _filmSession.Clear();
                     _filmSession = null;
                 }
                 _printJobList.Clear();
@@ -175,7 +200,7 @@ namespace PrintSCP
 
         public void OnReceiveAssociationRequest(DicomAssociation association)
         {
-            this.Logger.Info("Received association request from AE: {0} with IP: {1} ", association.CallingAE, RemoteIP);
+            this.Logger.Info("Received association request from AE: {0} with IP: {1} ", association.CallingAE, CallingIP);
 
             if (AETitle != association.CalledAE)
             {
@@ -248,7 +273,7 @@ namespace PrintSCP
 
         public DicomCEchoResponse OnCEchoRequest(DicomCEchoRequest request)
         {
-            this.Logger.Info("Received verification request from AE {0} with IP: {1}", CallingAE, RemoteIP);
+            this.Logger.Info("Received verification request from AE {0} with IP: {1}", CallingAE, CallingIP);
             return new DicomCEchoResponse(request, DicomStatus.Success);
         }
 
@@ -532,7 +557,7 @@ namespace PrintSCP
                 {
                     sb.AppendFormat("GetPrinter attribute {0} requested", item);
                     sb.AppendLine();
-                    var value = Printer.Get(item, "");
+                    var value = "undefine";
                     ds.Add(item, value);
                 }
 
@@ -541,15 +566,15 @@ namespace PrintSCP
             if (ds.Count() == 0)
             {
 
-                ds.Add(DicomTag.PrinterStatus, Printer.PrinterStatus);
+                ds.Add(DicomTag.PrinterStatus, "");
                 ds.Add(DicomTag.PrinterStatusInfo, "");
-                ds.Add(DicomTag.PrinterName, Printer.PrinterName);
-                ds.Add(DicomTag.Manufacturer, Printer.Manufacturer);
-                ds.Add(DicomTag.DateOfLastCalibration, Printer.DateTimeOfLastCalibration.Date);
-                ds.Add(DicomTag.TimeOfLastCalibration, Printer.DateTimeOfLastCalibration);
-                ds.Add(DicomTag.ManufacturerModelName, Printer.ManufacturerModelName);
-                ds.Add(DicomTag.DeviceSerialNumber, Printer.DeviceSerialNumber);
-                ds.Add(DicomTag.SoftwareVersions, Printer.SoftwareVersions);
+                ds.Add(DicomTag.PrinterName, "");
+                ds.Add(DicomTag.Manufacturer, "");
+                ds.Add(DicomTag.DateOfLastCalibration, "");
+                ds.Add(DicomTag.TimeOfLastCalibration, "");
+                ds.Add(DicomTag.ManufacturerModelName, "");
+                ds.Add(DicomTag.DeviceSerialNumber, "");
+                ds.Add(DicomTag.SoftwareVersions, "");
             }
 
             var response = new DicomNGetResponse(request, DicomStatus.Success);
@@ -591,7 +616,7 @@ namespace PrintSCP
                     {
                         sb.AppendFormat("GetPrintJob attribute {0} requested", item);
                         sb.AppendLine();
-                        var value = printJob.Get(item, "");
+                        var value = "";
                         dataset.Add(item, value);
                     }
 
@@ -669,12 +694,12 @@ namespace PrintSCP
                         }
                     }
 
-                    var printJob = new PrintJob(null, Printer, RemoteIP, CallingAE, CalledAE, this.Logger);
+                    var printJob = new PrintJob(null, CallingIP, CallingAE, CalledAE);
                     printJob.StatusUpdate += OnPrintJobStatusUpdate;
 
                     printJob.Print(filmBoxList);
 
-                    if (printJob.Error == null)
+                    if (!printJob.IsFailed)
                     {
                         var result = new DicomDataset();
                         result.Add(
@@ -695,7 +720,7 @@ namespace PrintSCP
                     }
                     else
                     {
-                        throw printJob.Error;
+                        throw new Exception(printJob.ErrorMessage);
                     }
                 }
                 catch (Exception ex)
@@ -720,10 +745,11 @@ namespace PrintSCP
                     printJob.SOPClassUID,
                     printJob.SOPInstanceUID,
                     e.EventTypeId);
+
                 var ds = new DicomDataset();
                 ds.Add(DicomTag.ExecutionStatusInfo, e.ExecutionStatusInfo);
                 ds.Add(DicomTag.FilmSessionLabel, e.FilmSessionLabel);
-                ds.Add(DicomTag.PrinterName, e.PrinterName);
+                ds.Add(DicomTag.PrinterName, AETitle);
 
                 reportRequest.Dataset = ds;
                 this.SendRequest(reportRequest);

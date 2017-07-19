@@ -14,7 +14,7 @@ using System.Drawing;
 using Dicom.Imaging;
 using Dicom;
 using Dicom.Printing;
-using Common;
+using DicomPrint.Common;
 
 namespace PrintSCP
 {
@@ -171,14 +171,19 @@ namespace PrintSCP
                     printJobDir.Create();
                 }
 
-                DicomFile dcmfile;
+                if (filmBoxList.Count > 0)
+                {
+                    FilmSession filmSession = filmBoxList[0].FilmSession;
+                    DicomFile dcmFile = new DicomFile(filmSession);
+
+                    dcmFile.Save(string.Format(@"{0}\FilmSession.dcm", printJobDir));
+                }
+
                 for (int i = 0; i < filmBoxList.Count; i++)
                 {
                     var filmBox = filmBoxList[i];
                     var filmBoxDir = printJobDir.CreateSubdirectory(string.Format("F{0:000000}", i + 1));
 
-                    dcmfile = new DicomFile(filmBox.FilmSession);
-                    dcmfile.Save(string.Format(@"{0}\FilmSession.dcm", filmBoxDir.FullName));
                     filmBox.Save(filmBoxDir.FullName);
 
                     //generate jpg image
@@ -230,7 +235,7 @@ namespace PrintSCP
                     if (item != null && item.ImageSequence != null && item.ImageSequence.Contains(DicomTag.PixelData))
                     {
                         var image = new DicomImage(item.ImageSequence);      
-                        Bitmap bitmap = image.RenderImage().AsBitmap();
+                        Bitmap bitmap = image.RenderImage().As<Bitmap>();
 
                         imageWidth = bitmap.Width;
                         imageHeight = bitmap.Height;
@@ -272,7 +277,8 @@ namespace PrintSCP
             }
             catch (Exception ex)
             {
-                LogManager.Instance.Error("Exception When Combine JPEG Image: {@error}", ex);
+                LogManager.Instance.Error("Exception When Combine JPEG Image: {0}", ex.Message);
+                throw ex;
             }
         }
 

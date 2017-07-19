@@ -11,7 +11,7 @@ using Dicom.Imaging;
 using Dicom.IO;
 using Dicom.Network;
 using Dicom.Printing;
-using Common;
+using DicomPrint.Common;
 
 namespace PrintSCU
 {

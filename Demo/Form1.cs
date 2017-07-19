@@ -13,7 +13,7 @@ namespace Demo
 {
     public partial class Form1 : Form
     {
-        private List<PrintTask> _printTasks = new List<PrintTask>();
+        private List<PrintTaskInfo> _printTasks = new List<PrintTaskInfo>();
 
         public Form1()
         {
@@ -38,9 +38,22 @@ namespace Demo
             PrintSCPService.Start();
 
             statusLabel.Text = "Print SCP Service started!";
+
+            //test printSCU
+            string taskPath = @"D:\PrintFolder\2017\07\19\127.0.0.1\local\1.3.6.1.4.1.30071.8.159090363644277.5537559105052076";
+            string strErr = PrintSCU.PrintSCUService.SendPrintTask("PRINTSCU", "PRINTSCP", "10.112.12.62", 8430, taskPath);
+            if(!string.IsNullOrEmpty(strErr))
+            {
+                //error happened.
+                MessageBox.Show("error happened, " + strErr);
+            }
+            else
+            {
+                MessageBox.Show("Success send task " + taskPath);
+            }
         }
 
-        private void PrintSCPService_PrintTaskEvent(PrintTask task)
+        private void PrintSCPService_PrintTaskEvent(PrintTaskInfo task)
         {
             Invoke((MethodInvoker)(() =>
             {

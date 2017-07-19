@@ -6,11 +6,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Common;
+using DicomPrint.Common;
 
 namespace PrintSCP
 {
-    public class PrintTask : EventArgs
+    public class PrintTaskInfo : EventArgs
     {
         public string CallingAETitle { get; set; }
 
@@ -23,12 +23,12 @@ namespace PrintSCP
         /// </summary>
         public string TaskPath { get; set; }
 
-        public bool IsFailed { get; set; }
+        public bool HasError { get; set; }
 
         public string ErrorMessage { get; set; }
     }
    
-    public delegate void PrintTaskEventHandler(PrintTask arg);
+    public delegate void PrintTaskEventHandler(PrintTaskInfo arg);
 
     public enum PrintSCPType
     {
@@ -366,7 +366,7 @@ namespace PrintSCP
 
             }
 
-            var filmBox = _filmSession.CreateFilmBox(request.SOPInstanceUID, request.Dataset);
+            FilmBox filmBox = _filmSession.CreateFilmBox(request.SOPInstanceUID, request.Dataset);
 
             if (!filmBox.Initialize())
             {
@@ -489,7 +489,7 @@ namespace PrintSCP
 
             LogManager.Instance.Info("Set image box {0}", request.SOPInstanceUID.UID);
 
-            var imageBox = _filmSession.FindImageBox(request.SOPInstanceUID);
+            ImageBox imageBox = _filmSession.FindImageBox(request.SOPInstanceUID);
             if (imageBox == null)
             {
                 LogManager.Instance.Error(
@@ -513,7 +513,7 @@ namespace PrintSCP
             }
 
             LogManager.Instance.Info("Set film box {0}", request.SOPInstanceUID.UID);
-            var filmBox = _filmSession.FindFilmBox(request.SOPInstanceUID);
+            FilmBox filmBox = _filmSession.FindFilmBox(request.SOPInstanceUID);
 
             if (filmBox == null)
             {
@@ -733,12 +733,12 @@ namespace PrintSCP
 
                     printJob.Print(filmBoxList);
 
-                    PrintTask arg = new PrintTask();
+                    PrintTaskInfo arg = new PrintTaskInfo();
                     arg.CallingAETitle = CallingAE;
                     arg.CallingIP = CallingIP;
                     arg.FilmSize = filmBoxList[0].FilmSizeID;//"TODO";
                     arg.TaskPath = printJob.PrintJobFolder;
-                    arg.IsFailed = printJob.IsFailed;
+                    arg.HasError = printJob.IsFailed;
                     arg.ErrorMessage = printJob.ErrorMessage;
 
                     if (PrintSCPService.PrintTaskEvent != null)

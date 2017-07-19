@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.IO;
 
-namespace Common
+namespace DicomPrint.Common
 {
     internal delegate void LogEventHanlder(string msg);
 

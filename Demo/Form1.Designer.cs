@@ -30,15 +30,15 @@
         {
             this.components = new System.ComponentModel.Container();
             this.statusStrip1 = new System.Windows.Forms.StatusStrip();
-            this.btnStartSCP = new System.Windows.Forms.Button();
             this.statusLabel = new System.Windows.Forms.ToolStripStatusLabel();
+            this.btnStartSCP = new System.Windows.Forms.Button();
             this.gridViewTasks = new System.Windows.Forms.DataGridView();
             this.bindingSource1 = new System.Windows.Forms.BindingSource(this.components);
             this.callingAETitleDataGridViewTextBoxColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.callingIPDataGridViewTextBoxColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.filmSizeDataGridViewTextBoxColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.taskPathDataGridViewTextBoxColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.isFailedDataGridViewCheckBoxColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.HasError = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.statusStrip1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.gridViewTasks)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.bindingSource1)).BeginInit();
@@ -54,6 +54,12 @@
             this.statusStrip1.TabIndex = 0;
             this.statusStrip1.Text = "statusStrip1";
             // 
+            // statusLabel
+            // 
+            this.statusLabel.Name = "statusLabel";
+            this.statusLabel.Size = new System.Drawing.Size(42, 17);
+            this.statusLabel.Text = "Ready.";
+            // 
             // btnStartSCP
             // 
             this.btnStartSCP.Location = new System.Drawing.Point(24, 27);
@@ -63,12 +69,6 @@
             this.btnStartSCP.Text = "Start PrintSCP Service";
             this.btnStartSCP.UseVisualStyleBackColor = true;
             this.btnStartSCP.Click += new System.EventHandler(this.btnStartSCP_Click);
-            // 
-            // statusLabel
-            // 
-            this.statusLabel.Name = "statusLabel";
-            this.statusLabel.Size = new System.Drawing.Size(42, 17);
-            this.statusLabel.Text = "Ready.";
             // 
             // gridViewTasks
             // 
@@ -85,7 +85,7 @@
             this.callingIPDataGridViewTextBoxColumn,
             this.filmSizeDataGridViewTextBoxColumn,
             this.taskPathDataGridViewTextBoxColumn,
-            this.isFailedDataGridViewCheckBoxColumn});
+            this.HasError});
             this.gridViewTasks.DataSource = this.bindingSource1;
             this.gridViewTasks.Location = new System.Drawing.Point(12, 86);
             this.gridViewTasks.Name = "gridViewTasks";
@@ -95,7 +95,7 @@
             // 
             // bindingSource1
             // 
-            this.bindingSource1.DataSource = typeof(PrintSCP.PrintTask);
+            this.bindingSource1.DataSource = typeof(PrintSCP.PrintTaskInfo);
             // 
             // callingAETitleDataGridViewTextBoxColumn
             // 
@@ -125,14 +125,12 @@
             this.taskPathDataGridViewTextBoxColumn.Name = "taskPathDataGridViewTextBoxColumn";
             this.taskPathDataGridViewTextBoxColumn.ReadOnly = true;
             // 
-            // isFailedDataGridViewCheckBoxColumn
+            // HasError
             // 
-            this.isFailedDataGridViewCheckBoxColumn.DataPropertyName = "IsFailed";
-            this.isFailedDataGridViewCheckBoxColumn.HeaderText = "IsFailed";
-            this.isFailedDataGridViewCheckBoxColumn.Name = "isFailedDataGridViewCheckBoxColumn";
-            this.isFailedDataGridViewCheckBoxColumn.ReadOnly = true;
-            this.isFailedDataGridViewCheckBoxColumn.Resizable = System.Windows.Forms.DataGridViewTriState.True;
-            this.isFailedDataGridViewCheckBoxColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            this.HasError.DataPropertyName = "HasError";
+            this.HasError.HeaderText = "HasError";
+            this.HasError.Name = "HasError";
+            this.HasError.ReadOnly = true;
             // 
             // Form1
             // 
@@ -161,11 +159,12 @@
         private System.Windows.Forms.ToolStripStatusLabel statusLabel;
         private System.Windows.Forms.DataGridView gridViewTasks;
         private System.Windows.Forms.BindingSource bindingSource1;
+        private System.Windows.Forms.DataGridViewTextBoxColumn isFailedDataGridViewCheckBoxColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn callingAETitleDataGridViewTextBoxColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn callingIPDataGridViewTextBoxColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn filmSizeDataGridViewTextBoxColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn taskPathDataGridViewTextBoxColumn;
-        private System.Windows.Forms.DataGridViewTextBoxColumn isFailedDataGridViewCheckBoxColumn;
+        private System.Windows.Forms.DataGridViewTextBoxColumn HasError;
     }
 }
 

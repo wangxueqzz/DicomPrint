@@ -91,6 +91,10 @@
       <Project>{da0187f7-ca83-455d-991e-0a72180246ea}</Project>
       <Name>PrintSCP</Name>
     </ProjectReference>
+    <ProjectReference Include="..\PrintSCU\PrintSCU.csproj">
+      <Project>{880f5e0b-e133-4e56-b965-147a0deaf2cd}</Project>
+      <Name>PrintSCU</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

@@ -14,7 +14,6 @@ using System.Drawing;
 using Dicom.Imaging;
 using Dicom;
 using Dicom.Printing;
-using DicomPrint.Common;
 
 namespace PrintSCP
 {

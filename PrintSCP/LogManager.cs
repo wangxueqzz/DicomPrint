@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.IO;
 
-namespace DicomPrint.Common
+namespace PrintSCP
 {
     internal delegate void LogEventHanlder(string msg);
 

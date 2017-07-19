@@ -31,14 +31,14 @@
             this.components = new System.ComponentModel.Container();
             this.statusStrip1 = new System.Windows.Forms.StatusStrip();
             this.statusLabel = new System.Windows.Forms.ToolStripStatusLabel();
-            this.btnStartSCP = new System.Windows.Forms.Button();
             this.gridViewTasks = new System.Windows.Forms.DataGridView();
-            this.bindingSource1 = new System.Windows.Forms.BindingSource(this.components);
             this.callingAETitleDataGridViewTextBoxColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.callingIPDataGridViewTextBoxColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.filmSizeDataGridViewTextBoxColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.taskPathDataGridViewTextBoxColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.HasError = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.SendPrint = new System.Windows.Forms.DataGridViewButtonColumn();
+            this.bindingSource1 = new System.Windows.Forms.BindingSource(this.components);
+            this.label1 = new System.Windows.Forms.Label();
             this.statusStrip1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.gridViewTasks)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.bindingSource1)).BeginInit();
@@ -60,16 +60,6 @@
             this.statusLabel.Size = new System.Drawing.Size(42, 17);
             this.statusLabel.Text = "Ready.";
             // 
-            // btnStartSCP
-            // 
-            this.btnStartSCP.Location = new System.Drawing.Point(24, 27);
-            this.btnStartSCP.Name = "btnStartSCP";
-            this.btnStartSCP.Size = new System.Drawing.Size(144, 40);
-            this.btnStartSCP.TabIndex = 1;
-            this.btnStartSCP.Text = "Start PrintSCP Service";
-            this.btnStartSCP.UseVisualStyleBackColor = true;
-            this.btnStartSCP.Click += new System.EventHandler(this.btnStartSCP_Click);
-            // 
             // gridViewTasks
             // 
             this.gridViewTasks.AllowUserToAddRows = false;
@@ -85,17 +75,14 @@
             this.callingIPDataGridViewTextBoxColumn,
             this.filmSizeDataGridViewTextBoxColumn,
             this.taskPathDataGridViewTextBoxColumn,
-            this.HasError});
+            this.SendPrint});
             this.gridViewTasks.DataSource = this.bindingSource1;
-            this.gridViewTasks.Location = new System.Drawing.Point(12, 86);
+            this.gridViewTasks.Location = new System.Drawing.Point(12, 62);
             this.gridViewTasks.Name = "gridViewTasks";
             this.gridViewTasks.ReadOnly = true;
-            this.gridViewTasks.Size = new System.Drawing.Size(611, 336);
+            this.gridViewTasks.Size = new System.Drawing.Size(611, 360);
             this.gridViewTasks.TabIndex = 2;
-            // 
-            // bindingSource1
-            // 
-            this.bindingSource1.DataSource = typeof(PrintSCP.PrintTaskInfo);
+            this.gridViewTasks.CellContentClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.gridViewTasks_CellContentClick);
             // 
             // callingAETitleDataGridViewTextBoxColumn
             // 
@@ -125,20 +112,34 @@
             this.taskPathDataGridViewTextBoxColumn.Name = "taskPathDataGridViewTextBoxColumn";
             this.taskPathDataGridViewTextBoxColumn.ReadOnly = true;
             // 
-            // HasError
+            // SendPrint
             // 
-            this.HasError.DataPropertyName = "HasError";
-            this.HasError.HeaderText = "HasError";
-            this.HasError.Name = "HasError";
-            this.HasError.ReadOnly = true;
+            this.SendPrint.HeaderText = "SendPrint";
+            this.SendPrint.Name = "SendPrint";
+            this.SendPrint.ReadOnly = true;
+            this.SendPrint.Text = "Print";
+            // 
+            // bindingSource1
+            // 
+            this.bindingSource1.DataSource = typeof(PrintSCP.PrintTaskInfo);
+            // 
+            // label1
+            // 
+            this.label1.AutoSize = true;
+            this.label1.Font = new System.Drawing.Font("Microsoft Sans Serif", 11F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label1.Location = new System.Drawing.Point(12, 31);
+            this.label1.Name = "label1";
+            this.label1.Size = new System.Drawing.Size(96, 18);
+            this.label1.TabIndex = 3;
+            this.label1.Text = "Print task list:";
             // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(635, 460);
+            this.Controls.Add(this.label1);
             this.Controls.Add(this.gridViewTasks);
-            this.Controls.Add(this.btnStartSCP);
             this.Controls.Add(this.statusStrip1);
             this.Name = "Form1";
             this.Text = "Demo";
@@ -155,16 +156,15 @@
         #endregion
 
         private System.Windows.Forms.StatusStrip statusStrip1;
-        private System.Windows.Forms.Button btnStartSCP;
         private System.Windows.Forms.ToolStripStatusLabel statusLabel;
         private System.Windows.Forms.DataGridView gridViewTasks;
         private System.Windows.Forms.BindingSource bindingSource1;
-        private System.Windows.Forms.DataGridViewTextBoxColumn isFailedDataGridViewCheckBoxColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn callingAETitleDataGridViewTextBoxColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn callingIPDataGridViewTextBoxColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn filmSizeDataGridViewTextBoxColumn;
         private System.Windows.Forms.DataGridViewTextBoxColumn taskPathDataGridViewTextBoxColumn;
-        private System.Windows.Forms.DataGridViewTextBoxColumn HasError;
+        private System.Windows.Forms.DataGridViewButtonColumn SendPrint;
+        private System.Windows.Forms.Label label1;
     }
 }
 

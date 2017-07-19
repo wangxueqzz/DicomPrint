@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using DicomPrint.Common;
 
 namespace PrintSCP
 {
@@ -39,20 +38,20 @@ namespace PrintSCP
 
     public class ReplaceTag
     {
-        public ReplaceTag(int group, int element, string value)
+        public ReplaceTag(ushort group, ushort element, string value)
         {
-            TagGroup = group;
-            TagElement = element;
+            Group = group;
+            Element = element;
             Value = value;
         }
 
-        public int TagGroup
+        public ushort Group
         {
             get;
             set;
         }
 
-        public int TagElement
+        public ushort Element
         {
             get;
             set;
@@ -73,7 +72,6 @@ namespace PrintSCP
         private static int _port = 8111;
         private static string _aeTitle = "PrintSCPService";
         private static string _printFileFolder = @"D:\PrintImages";
-        private static string _logPath = @"C:\PrintSCPLog";
 
         private static List<ReplaceTag> _replaceTags;
         private static DicomServer<PrintSCPService> _server;
@@ -104,8 +102,8 @@ namespace PrintSCP
 
         public static string LogPath
         {
-            get { return _logPath; }
-            set { _logPath = value; }
+            get { return LogManager.Instance.LogPath; }
+            set { LogManager.Instance.LogPath = value; }
         }
 
         public static string DicomPath
@@ -175,7 +173,6 @@ namespace PrintSCP
 
         public static void Start()
         {
-            LogManager.Instance.SetLogFolder(LogPath);
             if(_server == null)
             {
                 _server = new DicomServer<PrintSCPService>(Port);
@@ -206,7 +203,24 @@ namespace PrintSCP
             }
         }
 
-        public void Clean()
+        private void ReplaceTag(DicomDataset dataset)
+        {
+            List<ReplaceTag> tags = PrintSCPService.ReplaceTags;
+
+            if(tags != null && tags.Count > 0)
+            {
+                foreach(ReplaceTag tag in tags)
+                {
+                    DicomTag dt = new DicomTag(tag.Group, tag.Element);
+                    if(dataset.Contains(dt))
+                    {
+                        dataset.AddOrUpdate(dt, tag.Value);
+                    }
+                }
+            }
+        }
+
+        private void Clean()
         {
             lock (_synchRoot)
             {
@@ -500,6 +514,7 @@ namespace PrintSCP
             }
 
             request.Dataset.CopyTo(imageBox);
+            ReplaceTag(imageBox);
 
             return new DicomNSetResponse(request, DicomStatus.Success);
         }
@@ -527,6 +542,7 @@ namespace PrintSCP
             request.Dataset.CopyTo(filmBox);
 
             filmBox.Initialize();
+            ReplaceTag(filmBox);
 
             var response = new DicomNSetResponse(request, DicomStatus.Success);
             response.Command.Add(DicomTag.AffectedSOPInstanceUID, filmBox.SOPInstanceUID);
@@ -545,6 +561,8 @@ namespace PrintSCP
 
             LogManager.Instance.Info("Set film session {0}", request.SOPInstanceUID.UID);
             request.Dataset.CopyTo(_filmSession);
+
+            ReplaceTag(_filmSession);
 
             return new DicomNSetResponse(request, DicomStatus.Success);
         }

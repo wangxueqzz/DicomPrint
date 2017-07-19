@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace DicomPrint.Common
+namespace PrintSCU
 {
     public static class Extensions
     {

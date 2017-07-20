@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using PrintSCP;
+using PrintSCU;
 
 namespace Demo
 {
@@ -29,7 +30,7 @@ namespace Demo
             PrintSCPService.SCPType = PrintSCPType.GrayScaleColours;
 
             PrintSCPService.PrintTaskEvent += PrintSCPService_PrintTaskEvent;
-
+            PrintSCPService.EchoEvent += PrintSCPService_EchoEvent;
             //set replace tags
             List<ReplaceTag> replaceTags = new List<ReplaceTag>()
             {
@@ -42,12 +43,27 @@ namespace Demo
             PrintSCPService.Start();
 
             statusLabel.Text = "Print SCP Service started!";
+
+            //setup print SCU
+            PrintSCUService.LogPath = "C:\\PrintSCULog";
+        }
+
+        private void PrintSCPService_EchoEvent(EchoInfo arg)
+        {
+            Invoke((MethodInvoker)(() =>
+            {
+                string strMsg = string.Format("Get echo, CallingAE: {0}, CallingIP: {1}", arg.CallingAETitle, arg.CallingIP);
+                statusLabel.Text = strMsg;
+
+                MessageBox.Show(strMsg);
+            }));
         }
 
         private void PrintSCPService_PrintTaskEvent(PrintTaskInfo task)
         {
             Invoke((MethodInvoker)(() =>
             {
+                //new print task created by PrintSCP Service
                 _printTasks.Add(task);
 
                 bindingSource1.DataSource = null;
@@ -62,7 +78,7 @@ namespace Demo
                 DataGridViewColumn column = gridViewTasks.Columns[e.ColumnIndex];
                 if (column is DataGridViewButtonColumn)
                 {
-                    string taskPath = gridViewTasks.Rows[e.RowIndex].Cells[3].Value as string;
+                    string taskPath = @"D:\PrintFolder\2017\07\20\127.0.0.1\local\1.3.6.1.4.1.30071.8.224.5538696155152654";//gridViewTasks.Rows[e.RowIndex].Cells[3].Value as string;
 
                     //Send to dicom print by using PrintSCUService
                     string callingAE = "PRINTSCU";
@@ -70,7 +86,7 @@ namespace Demo
                     string calledAE = "PRINTSCP";
                     int calledPort = 8430;
 
-                    string strErr = PrintSCU.PrintSCUService.SendPrintTask(callingAE, calledAE, calledIP, calledPort, taskPath);
+                    string strErr = PrintSCUService.SendPrintTask(callingAE, calledAE, calledIP, calledPort, taskPath);
                     if (!string.IsNullOrEmpty(strErr))
                     {
                         //error happened.

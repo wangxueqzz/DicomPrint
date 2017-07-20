@@ -9,6 +9,16 @@ using System.Threading.Tasks;
 
 namespace PrintSCP
 {
+    public class EchoInfo : EventArgs
+    {
+        public string CallingAETitle { get; set; }
+
+        public string CallingIP { get; set; }
+
+    }
+
+    public delegate void EchoEventHandler(EchoInfo arg);
+
     public class PrintTaskInfo : EventArgs
     {
         public string CallingAETitle { get; set; }
@@ -78,6 +88,8 @@ namespace PrintSCP
 
         //the event used to inform client when there is a new print task.
         public static event PrintTaskEventHandler PrintTaskEvent;
+
+        public static event EchoEventHandler EchoEvent;
 
         public static int Port
         {
@@ -322,6 +334,13 @@ namespace PrintSCP
         public DicomCEchoResponse OnCEchoRequest(DicomCEchoRequest request)
         {
             LogManager.Instance.Info("Received verification request from AE {0} with IP: {1}", CallingAE, CallingIP);
+
+            if (EchoEvent != null)
+            {
+                EchoInfo echoInfo = new EchoInfo() { CallingAETitle = CalledAE, CallingIP = CallingIP };
+                EchoEvent(echoInfo);
+            }
+
             return new DicomCEchoResponse(request, DicomStatus.Success);
         }
 
@@ -514,7 +533,10 @@ namespace PrintSCP
             }
 
             request.Dataset.CopyTo(imageBox);
+
             ReplaceTag(imageBox);
+            ReplaceTag(imageBox.FilmBox);
+            ReplaceTag(imageBox.FilmBox.FilmSession);
 
             return new DicomNSetResponse(request, DicomStatus.Success);
         }

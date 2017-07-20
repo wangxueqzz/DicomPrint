@@ -40,6 +40,14 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\lib\Dicom.Platform.dll</HintPath>
     </Reference>
+    <Reference Include="PrintSCP, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\lib\PrintSCP.dll</HintPath>
+    </Reference>
+    <Reference Include="PrintSCU, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\lib\PrintSCU.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
@@ -85,16 +93,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\PrintSCP\PrintSCP.csproj">
-      <Project>{da0187f7-ca83-455d-991e-0a72180246ea}</Project>
-      <Name>PrintSCP</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\PrintSCU\PrintSCU.csproj">
-      <Project>{880f5e0b-e133-4e56-b965-147a0deaf2cd}</Project>
-      <Name>PrintSCU</Name>
-    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

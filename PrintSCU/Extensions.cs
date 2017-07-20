@@ -11,12 +11,7 @@ namespace PrintSCU
     {
         public static DicomDataset AddOrUpdate(this DicomDataset dataSet, DicomTag tag, string value)
         {
-            if (dataSet.Contains(tag))
-            {
-                dataSet.Remove(tag);
-            }
-
-            dataSet.Add(tag, value);
+            dataSet.Add<string>(tag, value);
 
             return dataSet;
         }

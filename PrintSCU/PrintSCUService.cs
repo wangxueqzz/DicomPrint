@@ -8,7 +8,7 @@ using Dicom.Printing;
 using Dicom.Network;
 using Dicom;
 
-namespace PrintSCU
+namespace DicomPrint.PrintSCU
 {
     public class PrintSCUService
     {
@@ -18,8 +18,12 @@ namespace PrintSCU
             set { LogManager.Instance.LogPath = value; }
         }
 
+        public static event PrintTaskEventHandler PrintTaskEvent;
+
         public static string SendPrintTask(string callingAE, string calledAE, string calledIP, int calledPort, string taskPath)
         {
+            PrintTaskInfo task = new PrintTaskInfo() { CallingAETitle = callingAE, TaskPath = taskPath };
+
             string strErr = string.Empty;
             LogManager.Instance.Log("Start to send print task: " + taskPath);
             try
@@ -90,11 +94,24 @@ namespace PrintSCU
                 dicomClient.AddRequest(new DicomNActionRequest(filmSession.SOPClassUID, filmSession.SOPInstanceUID, 0x0001));
 
                 dicomClient.Send(calledIP, calledPort, false, callingAE, calledAE);
+
+                task.HasError = false;
+                if (PrintTaskEvent != null)
+                {
+                    PrintTaskEvent(task);
+                }
             }
             catch(Exception e)
             {
                 strErr = e.Message;
                 LogManager.Instance.Log("Send task failed due to " + e.Message);
+
+                task.HasError = true;
+                task.ErrorMessage = e.Message;
+                if (PrintTaskEvent != null)
+                {
+                    PrintTaskEvent(task);
+                }
             }
 
             return strErr;

@@ -15,7 +15,7 @@ using Dicom.Imaging;
 using Dicom;
 using Dicom.Printing;
 
-namespace PrintSCP
+namespace DicomPrint.PrintSCP
 {
     internal class PrintStatusEventArgs : EventArgs
     {

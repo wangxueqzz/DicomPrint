@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
-using System.IO;
+using System.Threading.Tasks;
 
-namespace PrintSCP
+namespace DicomPrint
 {
     internal delegate void LogEventHanlder(string msg);
 
@@ -44,7 +45,7 @@ namespace PrintSCP
         {
             if (string.IsNullOrEmpty(_strLogFilePath))
             {
-                _strLogFilePath = "c:\\DicomPrintLog";
+                _strLogFilePath = "c:\\PrintSCULog";
             }
 
             if (!Directory.Exists(_strLogFilePath))
@@ -57,7 +58,7 @@ namespace PrintSCP
         {
             try
             {
-                if(!string.IsNullOrEmpty(folder))
+                if (!string.IsNullOrEmpty(folder))
                 {
                     if (!Directory.Exists(folder))
                     {

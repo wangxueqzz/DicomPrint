@@ -7,8 +7,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using PrintSCP;
-using PrintSCU;
+using DicomPrint;
+using DicomPrint.PrintSCP;
+using DicomPrint.PrintSCU;
 
 namespace Demo
 {
@@ -46,13 +47,34 @@ namespace Demo
 
             //setup print SCU
             PrintSCUService.LogPath = "C:\\PrintSCULog";
+            PrintSCUService.PrintTaskEvent += PrintSCUService_PrintTaskEvent;
         }
 
-        private void PrintSCPService_EchoEvent(EchoInfo arg)
+        private void gridViewTasks_CellContentClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex >= 0)
+            {
+                DataGridViewColumn column = gridViewTasks.Columns[e.ColumnIndex];
+                if (column is DataGridViewButtonColumn)
+                {
+                    string taskPath = gridViewTasks.Rows[e.RowIndex].Cells[3].Value as string;
+
+                    //Send to dicom print by using PrintSCUService
+                    string callingAE = "PRINTSCU";
+                    string calledIP = "localhost";
+                    string calledAE = "PRINTSCP";
+                    int calledPort = 8430;
+
+                    PrintSCUService.SendPrintTask(callingAE, calledAE, calledIP, calledPort, taskPath);
+                }
+            }
+        }
+
+        private void PrintSCPService_EchoEvent(EchoInfo echo)
         {
             Invoke((MethodInvoker)(() =>
             {
-                string strMsg = string.Format("Get echo, CallingAE: {0}, CallingIP: {1}", arg.CallingAETitle, arg.CallingIP);
+                string strMsg = string.Format("Get echo, CallingAE: {0}, CallingIP: {1}", echo.CallingAETitle, echo.CallingIP);
                 statusLabel.Text = strMsg;
 
                 MessageBox.Show(strMsg);
@@ -71,33 +93,20 @@ namespace Demo
             }));
         }
 
-        private void gridViewTasks_CellContentClick(object sender, DataGridViewCellEventArgs e)
+        void PrintSCUService_PrintTaskEvent(PrintTaskInfo task)
         {
-            if (e.RowIndex >= 0)
+            Invoke((MethodInvoker)(() =>
             {
-                DataGridViewColumn column = gridViewTasks.Columns[e.ColumnIndex];
-                if (column is DataGridViewButtonColumn)
+                if (task.HasError)
                 {
-                    string taskPath = @"D:\PrintFolder\2017\07\20\127.0.0.1\local\1.3.6.1.4.1.30071.8.224.5538696155152654";//gridViewTasks.Rows[e.RowIndex].Cells[3].Value as string;
-
-                    //Send to dicom print by using PrintSCUService
-                    string callingAE = "PRINTSCU";
-                    string calledIP = "localhost";
-                    string calledAE = "PRINTSCP";
-                    int calledPort = 8430;
-
-                    string strErr = PrintSCUService.SendPrintTask(callingAE, calledAE, calledIP, calledPort, taskPath);
-                    if (!string.IsNullOrEmpty(strErr))
-                    {
-                        //error happened.
-                        MessageBox.Show("error happened due to " + strErr);
-                    }
-                    else
-                    {
-                        MessageBox.Show("Success send task " + taskPath);
-                    }
+                    MessageBox.Show("Send print task failed due to " + task.ErrorMessage);
                 }
-            }
+                else
+                {
+                    MessageBox.Show("Success print task success:  " + task.TaskPath);
+                }
+            }));
         }
+
     }
 }

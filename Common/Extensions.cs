@@ -7,7 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace PrintSCP
+namespace DicomPrint
 {
     public static class Extensions
     {
@@ -228,7 +228,7 @@ namespace PrintSCP
                 }
             }
 
-            if (vr == DicomVR.UR) 
+            if (vr == DicomVR.UR)
             {
                 if (values == null) return dataset.Add(new DicomUniversalResource(tag, DicomEncoding.Default, EmptyBuffer.Value));
                 if (typeof(T) == typeof(string)) return dataset.Add(new DicomUniversalResource(tag, values.Cast<string>().First()));
